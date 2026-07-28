@@ -468,6 +468,17 @@ html.dark input,html.dark textarea,html.dark select{color:var(--text)}
 /* ===== 进步曲线 ===== */
 .ex-progress .pr-chart{font-size:10px;color:var(--primary);cursor:pointer;margin-left:auto;font-weight:600}
 .ex-progress .pr-chart:active{opacity:.6}
+/* 逐组输入行 */
+.ex-setrows{display:flex;flex-direction:column;gap:4px;margin:6px 0}
+.ex-set{display:flex;align-items:center;gap:4px;font-size:12px;padding:4px 6px;background:var(--bg-2);border-radius:6px}
+.ex-set .es-lbl{width:16px;height:16px;border-radius:50%;background:var(--card);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;color:var(--muted);flex-shrink:0}
+.ex-set input{width:44px;background:var(--card);border:1px solid var(--border);border-radius:6px;padding:4px;font-size:12px;text-align:center;color:var(--text);outline:none}
+.ex-set input:focus{border-color:var(--primary)}
+.ex-set .es-u{font-size:10px;color:var(--muted);min-width:14px}
+.ex-setctrl{display:flex;align-items:center;gap:6px;margin-top:4px;font-size:12px}
+.ex-setctrl .stepper{display:flex;align-items:center}
+.ex-setctrl .stepper .step{width:24px;height:24px;border-radius:6px;background:var(--card);border:1px solid var(--border);font-size:14px;line-height:1;color:var(--text);padding:0}
+.ex-setctrl .stepper input{width:32px;background:var(--card);border:none;font-size:12px;text-align:center;color:var(--text)}
 .chart-overlay{position:fixed;inset:0;z-index:9998;background:rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center;padding:20px}
 .chart-box{background:var(--card);border-radius:16px;max-width:420px;width:100%;padding:16px;box-shadow:0 8px 30px rgba(0,0,0,.2)}
 .chart-box .cb-head{display:flex;justify-content:space-between;align-items:center;font-size:14px;font-weight:700;margin-bottom:10px}
@@ -1699,7 +1710,10 @@ function buildExerciseCard(ex,i){
   const setsNum=parseInt((ex.s||'').match(/(\d+)/)?.[1]||3);
   const exCal=(ex.cal||0)*setsNum;
   const prog=profile().exProgress?.[ex.n]||{};
-  const valStr=(prog.sets?prog.sets+'组×':'')+(prog.weight?prog.weight+'kg×':'')+(prog.reps?prog.reps+'次':'—');
+  // 上次显示：从 setsData（逐组记录）或旧格式 weight/reps 获取
+  const lastSets=prog.setsData||[];
+  const valStr=lastSets.length?lastSets.map(s=>(s.weight?s.weight+'kg×':'')+(s.reps?s.reps+'次':'')).join('·')+' ('+lastSets.length+'组)':(prog.weight?prog.weight+'kg×'+prog.reps+'次':'—');
+  const rowCount=Math.max(lastSets.length||0, setsNum, 3); // 最少3行
   const div=document.createElement('div');
   div.className='exercise'+(done?' done':'');
   div.innerHTML='<div class="ex-head"><div class="name">'+ex.n+' <span class="sets">'+ex.s+'</span></div><div class="check '+(done?'checked':'')+'" data-i="'+i+'">✓</div></div>'+
@@ -1707,17 +1721,34 @@ function buildExerciseCard(ex,i){
     '<a class="ex-vlink" href="'+videoLink(ex.n)+'" target="_blank">📺 教学</a>'+
     '<span class="ex-swap" data-i="'+i+'">🔄 替换</span></div>'+
     '<div class="ex-tip"><b>要领：</b>'+ex.t+'</div>'+
-    '<div class="ex-progress"><span class="pr-label">上次</span><span class="pr-val">'+valStr+'</span>'+
-    '<span class="stepper"><button type="button" class="step minus" data-f="w">−</button><input class="pr-w" type="number" placeholder="kg" min="0" step="0.5" value="'+(prog.weight||'')+'"><button type="button" class="step plus" data-f="w">+</button></span>'+
-    '<span class="stepper"><button type="button" class="step minus" data-f="r">−</button><input class="pr-r" type="number" placeholder="次" min="0" value="'+(prog.reps||'')+'"><button type="button" class="step plus" data-f="r">+</button></span>'+
-    '<span class="stepper"><button type="button" class="step minus" data-f="n">−</button><input class="pr-n" type="number" min="1" value="'+(prog.sets||setsNum)+'"><button type="button" class="step plus" data-f="n">+</button></span>'+
+    '<div class="ex-progress"><span class="pr-label">上次</span><span class="pr-val">'+valStr+'</span></div>'+
+    '<div class="ex-setrows"></div>'+
+    '<div class="ex-setctrl"><span class="stepper"><button type="button" class="step minus" data-f="n">−</button><input class="pr-n" type="number" min="1" value="'+(prog.sets||setsNum)+'"><button type="button" class="step plus" data-f="n">+</button></span>'+
     '<span class="pr-nl">组</span>'+
     '<button class="pr-save" data-en="'+ex.n+'">记录</button>'+
     '<span class="pr-chart" data-en="'+ex.n+'">📈 进步</span></div>';
-  // 勾选（打卡前可先填重量，勾选时自动记录到进步历史）
+  // 填充逐组输入行
+  const srows=div.querySelector('.ex-setrows');
+  for(let si=0;si<rowCount;si++){
+    const last=lastSets[si]||{};
+    const row=document.createElement('div');row.className='ex-set';
+    row.innerHTML='<span class="es-lbl">'+(si+1)+'</span><input class="es-w" type="number" min="0" step="0.5" placeholder="kg" value="'+(last.weight||'')+'"><span class="es-u">kg</span><input class="es-r" type="number" min="0" placeholder="次" value="'+(last.reps||'')+'"><span class="es-u">次</span>';
+    srows.appendChild(row);
+  }
+  // 收集所有组数据
+  function collectSets(){
+    const rows=srows.querySelectorAll('.ex-set');
+    const data=[];
+    rows.forEach(r=>{
+      const w=parseFloat(r.querySelector('.es-w').value);
+      const reps=parseInt(r.querySelector('.es-r').value);
+      if(w&&reps)data.push({weight:w,reps});
+    });
+    return data;
+  }
+  // 勾选（先记录逐组数据，再打卡）
   div.querySelector('.check').onclick=()=>{
-    const w=parseFloat(div.querySelector('.pr-w').value),r=parseInt(div.querySelector('.pr-r').value),n=parseInt(div.querySelector('.pr-n')?.value)||setsNum;
-    if(w&&r)recordExProgress(ex.n,w,r,n);
+    const data=collectSets(); if(data.length)recordExProgress(ex.n,data);
     const t=profile().checkins[recKey()]||{part:null,exercises:{}};
     if(!t.exercises[curPart])t.exercises[curPart]={};
     if(t.exercises[curPart][i])delete t.exercises[curPart][i];
@@ -1728,37 +1759,28 @@ function buildExerciseCard(ex,i){
   };
   // 替换按钮
   div.querySelector('.ex-swap').onclick=()=>showSwapPicker(i,ex.n);
-  // 重量输入实时存草稿（勾选前即可填写）
-  const wInput=div.querySelector('.pr-w'),rInput=div.querySelector('.pr-r'),nInput=div.querySelector('.pr-n');
-  const saveDraft=()=>{
-    const w=parseFloat(wInput.value),r=parseInt(rInput.value),n=parseInt(nInput?.value)||setsNum;
-    if(!profile().exProgress)profile().exProgress={};
-    const p=profile().exProgress[ex.n]||{};
-    if(w)p.weight=w; if(r)p.reps=r; if(n)p.sets=n; if(w||r)p.date=recKey();
-    profile().exProgress[ex.n]=p; saveLocal();
-  };
-  wInput.addEventListener('input',saveDraft); rInput.addEventListener('input',saveDraft);
-  // +/- 步进按钮：快捷增减重量/次数并保存草稿
+  // 组数步进：保存现有值→重实行数
+  const nInput=div.querySelector('.pr-n');
   div.querySelectorAll('.stepper .step').forEach(btn=>{
     btn.onclick=()=>{
-      const f=btn.dataset.f;
-      const inp=f==='w'?wInput:(f==='r'?rInput:nInput);
-      const step=f==='w'?1.25:1;
-      let v=parseFloat(inp.value);
-      if(isNaN(v))v=0;
-      v+=(btn.classList.contains('plus')?1:-1)*step;
-      if(v<0)v=0; if(f==='n'&&v<1)v=1;
-      inp.value=(f==='w'?Math.round(v*100)/100:Math.round(v));
-      saveDraft();
+      const curData=collectSets();
+      let v=parseFloat(nInput.value)||rowCount;
+      v+=btn.classList.contains('plus')?1:-1;
+      if(v<1)v=1; nInput.value=v;
+      srows.innerHTML='';
+      for(let si=0;si<v;si++){
+        const last=curData[si]||{};
+        const r=document.createElement('div');r.className='ex-set';
+        r.innerHTML='<span class="es-lbl">'+(si+1)+'</span><input class="es-w" type="number" min="0" step="0.5" placeholder="kg" value="'+(last.weight||'')+'"><span class="es-u">kg</span><input class="es-r" type="number" min="0" placeholder="次" value="'+(last.reps||'')+'"><span class="es-u">次</span>';
+        srows.appendChild(r);
+      }
     };
   });
   // 记录按钮 → 写入进步历史
   div.querySelector('.pr-save').onclick=function(){
-    const w=parseFloat(this.parentElement.querySelector('.pr-w').value);
-    const r=parseInt(this.parentElement.querySelector('.pr-r').value);
-    const n=parseInt(this.parentElement.querySelector('.pr-n')?.value)||setsNum;
-    if(!w||!r){showFoodHint('请先填写重量和次数');return;}
-    recordExProgress(this.dataset.en,w,r,n);
+    const data=collectSets();
+    if(!data.length){showFoodHint('请至少填写一组重量和次数');return;}
+    recordExProgress(this.dataset.en,data);
     renderExercises();
   };
   // 进步曲线
@@ -2703,17 +2725,22 @@ function drawBodyChart(){
   drawLineChart(canvas,pts,'#22d3ee','kg');
 }
 
-/* 训练进步曲线 */
-function recordExProgress(en,w,r,s){
+/* 训练进步曲线（逐组记录） */
+function recordExProgress(en,setsData){
   if(!profile().exProgress)profile().exProgress={};
   const p=profile().exProgress[en]||{};
-  p.weight=w;p.reps=r;p.sets=s||p.sets||3;p.date=recKey();
   if(!p.history)p.history=[];
   const dk=recKey();
   const idx=p.history.findIndex(h=>h.date===dk);
-  const rec={date:dk,weight:w,reps:r,sets:s||p.sets};
+  const rec={date:dk,setsData};
   if(idx>=0)p.history[idx]=rec;else p.history.push(rec);
   p.history.sort((a,b)=>a.date<b.date?-1:1);
+  p.setsData=setsData; // 缓存供「上次」显示
+  if(setsData.length){
+    const last=setsData[setsData.length-1];
+    p.weight=last.weight; p.reps=last.reps; p.sets=setsData.length;
+  }
+  p.date=dk;
   profile().exProgress[en]=p;
   save();
 }
@@ -2726,7 +2753,7 @@ function showProgressChart(en){
   overlay.querySelector('.cb-close').onclick=()=>overlay.remove();
   const canvas=overlay.querySelector('#pcCanvas');
   if(hist.length<1){canvas.style.display='none';overlay.querySelector('#pcEmpty').style.display='block';return;}
-  drawLineChart(canvas,hist.map(h=>({d:h.date,v:h.weight})),'#5b8cff','kg');
+  drawLineChart(canvas,hist.map(h=>({d:h.date,v:h.setsData?Math.max(...h.setsData.map(s=>s.weight||0)):(h.weight||0)})),'#5b8cff','kg');
 }
 
 /* 月度报告 */

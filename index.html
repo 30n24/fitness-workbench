@@ -13,7 +13,7 @@
 <script>
 if('serviceWorker' in navigator){
   window.addEventListener('load',function(){
-    navigator.serviceWorker.register('./sw.js?v=3').then(function(reg){
+    navigator.serviceWorker.register('./sw.js?v=4').then(function(reg){
       console.log('SW registered:',reg.scope);
     }).catch(function(e){console.log('SW failed:',e)});
   });
@@ -21,11 +21,18 @@ if('serviceWorker' in navigator){
 </script>
 <style>
 /* 首屏 Loading - 内联最优先，避免白屏 */
-#appLoader{position:fixed;inset:0;z-index:9999;background:#f4f6fb;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;transition:opacity .4s}
+/* 首屏骨架屏 - 内联最优先，避免白屏 */
+#appLoader{position:fixed;inset:0;z-index:9999;background:var(--bg);display:flex;flex-direction:column;overflow:hidden;transition:opacity .4s}
 #appLoader.hide{opacity:0;pointer-events:none}
-#appLoader .spinner{width:44px;height:44px;border:3px solid #e2e6ef;border-top-color:#4f7cff;border-radius:50%;animation:spin .7s linear infinite}
-#appLoader .text{font-size:14px;color:#4a5568;font-weight:600}
-#appLoader .sub{font-size:11px;color:#9aa4b2}
+.sk-topbar{height:56px;background:var(--card);border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px;padding:0 16px;flex:0 0 auto}
+.sk-avatar{width:34px;height:34px;border-radius:50%;flex:0 0 auto;background:linear-gradient(90deg,var(--bg-2) 25%,var(--border) 37%,var(--bg-2) 63%);background-size:400% 100%;animation:shimmer 1.3s ease infinite}
+.sk-body{padding:16px 14px;display:flex;flex-direction:column;gap:12px;flex:1;overflow:hidden}
+.sk-card{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:14px;display:flex;flex-direction:column;gap:10px}
+.sk-line{height:12px;border-radius:6px;background:linear-gradient(90deg,var(--bg-2) 25%,var(--border) 37%,var(--bg-2) 63%);background-size:400% 100%;animation:shimmer 1.3s ease infinite}
+.sk-line.w30{width:30%}.sk-line.w45{width:45%}.sk-line.w60{width:60%}.sk-line.w75{width:75%}.sk-line.w90{width:90%}
+@keyframes shimmer{0%{background-position:100% 0}100%{background-position:-100% 0}}
+html.dark #appLoader{background:#0f1420}
+html.dark .sk-line,html.dark .sk-avatar{background:linear-gradient(90deg,#1c2433 25%,#2a3450 37%,#1c2433 63%);background-size:400% 100%}
 @keyframes spin{to{transform:rotate(360deg)}
 </style>
 <style>
@@ -476,10 +483,48 @@ html.dark input,html.dark textarea,html.dark select{color:var(--text)}
 .report-card .rc-stat .rv{font-weight:700}
 .report-card .rc-canvas{width:100%;height:160px;display:block;margin:12px 0}
 .report-card .rc-close{margin-top:14px;width:100%;padding:12px;border-radius:12px;background:var(--bg-2);border:1px solid var(--border);font-size:14px;font-weight:600;color:var(--text);text-align:center;cursor:pointer}
+
+/* 同步状态小图标 */
+.sync-dot{display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:600;padding:4px 9px;border-radius:999px;background:var(--bg-2);border:1px solid var(--border);color:var(--muted);cursor:pointer;transition:.2s;white-space:nowrap;line-height:1}
+.sync-dot .sync-ico{font-size:12px;line-height:1;display:inline-block}
+.sync-dot.ok{color:var(--green);background:rgba(16,185,129,.12);border-color:rgba(16,185,129,.32)}
+.sync-dot.sync{color:var(--primary);background:rgba(79,124,255,.12);border-color:rgba(79,124,255,.32)}
+.sync-dot.err{color:var(--red);background:rgba(239,68,68,.12);border-color:rgba(239,68,68,.32)}
+.sync-dot.offline{color:var(--muted);opacity:.75}
+.sync-dot.sync .sync-ico{animation:spin .7s linear infinite}
+html.dark .sync-dot{background:rgba(255,255,255,.06)}
+
+/* 日历日弹窗 */
+.day-popup{position:fixed;z-index:9000;width:min(86vw,300px);background:var(--card);border:1px solid var(--border);border-radius:14px;box-shadow:0 12px 40px rgba(15,23,42,.18);padding:12px 13px;font-size:12px;color:var(--text);display:none;animation:dpIn .12s ease}
+.day-popup.show{display:block}
+@keyframes dpIn{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
+.day-popup .dp-date{font-size:13px;font-weight:800;margin-bottom:9px;display:flex;align-items:center;gap:6px}
+.day-popup .dp-prof{margin-bottom:9px;padding-bottom:9px;border-bottom:1px dashed var(--border)}
+.day-popup .dp-prof:last-child{margin-bottom:0;padding-bottom:0;border-bottom:none}
+.day-popup .dp-pn{font-weight:700;font-size:12px;margin-bottom:5px;display:flex;align-items:center;gap:5px}
+.day-popup .dp-row{display:flex;justify-content:space-between;gap:10px;padding:2px 0;color:var(--muted)}
+.day-popup .dp-row .dv{color:var(--text);font-weight:600;text-align:right}
+.day-popup .dp-tag{display:inline-block;font-size:10px;padding:1px 6px;border-radius:6px;margin-left:2px;font-weight:700}
+.day-popup .dp-tag.low{background:rgba(16,185,129,.14);color:var(--green)}
+.day-popup .dp-tag.high{background:rgba(249,115,22,.14);color:var(--orange)}
+
+/* 虚拟滚动容器 */
+.exercise-list.virtual{position:relative;min-height:60px}
+/* 周日历星期标签 */
+.week-cell.label{background:transparent;border-color:transparent;color:var(--muted);font-weight:700;font-size:11px}
 </style>
 </head>
 <body>
-<div id="appLoader"><div class="spinner"></div><div class="text">💪 健身计划工作台</div><div class="sub">加载中…</div></div>
+<div id="appLoader">
+  <div class="sk-topbar"><div class="sk-avatar"></div><div class="sk-line w45"></div></div>
+  <div class="sk-body">
+    <div class="sk-card"><div class="sk-line w30"></div><div class="sk-line w90"></div><div class="sk-line w75"></div></div>
+    <div class="sk-card"><div class="sk-line w45"></div><div class="sk-line w90"></div><div class="sk-line w60"></div></div>
+    <div class="sk-card"><div class="sk-line w30"></div><div class="sk-line w75"></div></div>
+    <div class="sk-card"><div class="sk-line w90"></div><div class="sk-line w60"></div><div class="sk-line w45"></div></div>
+  </div>
+</div>
+<div class="day-popup" id="dayPopup"></div>
 
 <!-- 选人页 -->
 <div class="select-page" id="selectPage">
@@ -523,7 +568,7 @@ html.dark input,html.dark textarea,html.dark select{color:var(--text)}
     </div>
   </div>
   <div class="right">
-    <span class="sync-dot" id="syncDot">☁ —</span>
+    <span class="sync-dot" id="syncDot"><span class="sync-ico">☁</span><span class="sync-txt">—</span></span>
     <button class="theme-btn" id="themeBtn" title="切换深色/浅色">🌙</button>
     <button class="switch-user" id="switchUser" title="切换计划">🔄</button>
     <button class="switch-user" id="homeBtn" title="返回选人">🏠</button>
@@ -1318,10 +1363,17 @@ function isTyping(){const a=document.activeElement;return a&&(a.tagName==='INPUT
 function setSyncStatus(s){
   const el=document.getElementById('syncDot');
   if(!el)return;
-  if(s==='ok'){el.textContent='☁ 已同步';el.className='sync-dot ok';el.title='点击手动同步';}
-  else if(s==='syncing'){el.textContent='☁ 同步中…';el.className='sync-dot sync';el.title='同步进行中…';}
-  else if(s==='err'){el.textContent='☁ 未同步';el.className='sync-dot err';el.title='点击重新同步';}
-  // 点击手动触发拉取
+  const ico=el.querySelector('.sync-ico'), txt=el.querySelector('.sync-txt');
+  let icon='☁',label='—',cls='sync-dot',title='';
+  if(s==='ok'){icon='✅';label='已同步';cls+=' ok';title='点击手动同步';}
+  else if(s==='syncing'){icon='🔄';label='同步中';cls+=' sync';title='同步进行中…';}
+  else if(s==='err'){icon='⚠️';label='同步失败';cls+=' err';title='点击重新同步';}
+  else if(s==='offline'){icon='📡';label='离线';cls+=' offline';title='网络已断开，恢复后自动同步';}
+  el.className=cls;
+  if(ico)ico.textContent=icon;
+  if(txt)txt.textContent=label;
+  el.title=title;
+  // 点击手动触发拉取（仅绑定一次）
   if(!el._syncClick){
     el._syncClick=true;
     el.onclick=()=>{if(cloudReady()&&!_syncing&&_inApp){setSyncStatus('syncing');doSync(null,true);}};
@@ -1432,6 +1484,72 @@ function renderParts(){
   });
 }
 
+/* 构建单个动作卡片（普通渲染与虚拟滚动共用）*/
+function buildExerciseCard(ex,i){
+  const done=profile().checkins[todayKey()]?.exercises?.[curPart]?.[i]||false;
+  const setsNum=parseInt((ex.s||'').match(/(\d+)/)?.[1]||3);
+  const exCal=(ex.cal||0)*setsNum;
+  const prog=profile().exProgress?.[ex.n]||{};
+  const lastW=prog.weight?prog.weight+'kg':'—';
+  const lastR=prog.reps?prog.reps+'次':'—';
+  const div=document.createElement('div');
+  div.className='exercise'+(done?' done':'');
+  div.innerHTML='<div class="ex-head"><div class="name">'+ex.n+' <span class="sets">'+ex.s+'</span></div><div class="check '+(done?'checked':'')+'" data-i="'+i+'">✓</div></div>'+
+    '<div class="ex-meta"><span class="ex-blogger">📌 '+(ex.b||'综合推荐')+'</span><span class="ex-cal">🔥 ~'+exCal+'kcal</span>'+
+    '<a class="ex-vlink" href="'+videoLink(ex.n)+'" target="_blank">📺 教学</a>'+
+    '<span class="ex-swap" data-i="'+i+'">🔄 替换</span></div>'+
+    '<div class="ex-tip"><b>要领：</b>'+ex.t+'</div>'+
+    '<div class="ex-progress"><span class="pr-label">上次</span><span class="pr-val">'+lastW+' · '+lastR+'</span>'+
+    '<input class="pr-w" type="number" placeholder="kg" min="0" step="0.5" value="'+(prog.weight||'')+'"><input class="pr-r" type="number" placeholder="次" min="0" value="'+(prog.reps||'')+'"><button class="pr-save" data-en="'+ex.n+'">记录</button>'+
+    '<span class="pr-chart" data-en="'+ex.n+'">📈 进步</span></div>';
+  // 勾选（打卡前可先填重量，勾选时自动记录到进步历史）
+  div.querySelector('.check').onclick=()=>{
+    const w=parseFloat(div.querySelector('.pr-w').value),r=parseInt(div.querySelector('.pr-r').value);
+    if(w&&r)recordExProgress(ex.n,w,r);
+    const t=profile().checkins[todayKey()]||{part:null,exercises:{}};
+    if(!t.exercises[curPart])t.exercises[curPart]={};
+    if(t.exercises[curPart][i])delete t.exercises[curPart][i];
+    else t.exercises[curPart][i]=true;
+    t.part=curPart;
+    profile().checkins[todayKey()]=t;
+    save();renderExercises();
+  };
+  // 替换按钮
+  div.querySelector('.ex-swap').onclick=()=>showSwapPicker(i,ex.n);
+  // 重量输入实时存草稿（勾选前即可填写）
+  const wInput=div.querySelector('.pr-w'),rInput=div.querySelector('.pr-r');
+  const saveDraft=()=>{
+    const w=parseFloat(wInput.value),r=parseInt(rInput.value);
+    if(!profile().exProgress)profile().exProgress={};
+    const p=profile().exProgress[ex.n]||{};
+    if(w)p.weight=w; if(r)p.reps=r; if(w||r)p.date=todayKey();
+    profile().exProgress[ex.n]=p; saveLocal();
+  };
+  wInput.addEventListener('input',saveDraft); rInput.addEventListener('input',saveDraft);
+  // 记录按钮 → 写入进步历史
+  div.querySelector('.pr-save').onclick=function(){
+    const w=parseFloat(this.parentElement.querySelector('.pr-w').value);
+    const r=parseInt(this.parentElement.querySelector('.pr-r').value);
+    if(!w||!r){showFoodHint('请先填写重量和次数');return;}
+    recordExProgress(this.dataset.en,w,r);
+    renderExercises();
+  };
+  // 进步曲线
+  div.querySelector('.pr-chart').onclick=()=>showProgressChart(ex.n);
+  return div;
+}
+function updateExCalBar(totalCal,doneCal,n){
+  const calBar=document.getElementById('calBar');
+  const calTotal=document.getElementById('calTotal');
+  const calDetail=document.getElementById('calDetail');
+  if(calBar&&totalCal>0){
+    calBar.style.display='block';
+    calTotal.textContent=doneCal+'/'+totalCal+'kcal';
+    calDetail.innerHTML='完成 '+doneCal+'kcal 共'+n+'项';
+  } else if(calBar){ calBar.style.display='none'; }
+}
+
+const EX_VT=8; // 动作数超过此阈值启用虚拟滚动（仅渲染屏幕内动作）
 function renderExercises(){
   const info=partsList().find(p=>p.key===curPart);
   document.getElementById('trainIcon').textContent=info.emoji;
@@ -1444,96 +1562,95 @@ function renderExercises(){
   };
   document.getElementById('trainDesc').textContent=descs[curPart]||'';
   const list=document.getElementById('exerciseList');
-  list.innerHTML='';
   const allExs=(exData()[curPart]||[]);
   if(curPart==='rest'){
+    exitVirtual(list);
+    list.innerHTML='';
     allExs.forEach(ex=>{
       const div=document.createElement('div');
       div.className='exercise';
       div.innerHTML='<div class="ex-head"><div class="name">'+ex.n+' <span class="sets">'+ex.s+'</span></div></div><div class="ex-tip"><b>要领：</b>'+ex.t+'</div>';
       list.appendChild(div);
     });
+    updateExCalBar(0,0,0);
     return;
   }
   // 应用替换配置
   const swaps=profile().exSwaps||{};
   const exs=allExs.map((ex,i)=>{const s=swaps[curPart+'_'+i];return s?swaps[curPart+'_'+i]:ex;});
-  const MAX_VISIBLE=5;
-  var visible=window._exExpanded?exs:exs.slice(0,MAX_VISIBLE);
+  // 计算热量
   let totalCal=0,doneCal=0;
-  visible.forEach((ex,i)=>{
-    const origIdx=i<MAX_VISIBLE?i:exs.indexOf(ex);
-    const done=profile().checkins[todayKey()]?.exercises?.[curPart]?.[i]||false;
+  exs.forEach((ex,i)=>{
     const setsNum=parseInt((ex.s||'').match(/(\d+)/)?.[1]||3);
-    const exCal=(ex.cal||0)*setsNum;
-    totalCal+=exCal;
-    if(done)doneCal+=exCal;
-    const prog=profile().exProgress?.[ex.n]||{};
-    const lastW=prog.weight?prog.weight+'kg':'—';
-    const lastR=prog.reps?prog.reps+'次':'—';
-    const div=document.createElement('div');
-    div.className='exercise'+(done?' done':'');
-    div.innerHTML='<div class="ex-head"><div class="name">'+ex.n+' <span class="sets">'+ex.s+'</span></div><div class="check '+(done?'checked':'')+'" data-i="'+i+'">✓</div></div>'+
-      '<div class="ex-meta"><span class="ex-blogger">📌 '+(ex.b||'综合推荐')+'</span><span class="ex-cal">🔥 ~'+exCal+'kcal</span>'+
-      '<a class="ex-vlink" href="'+videoLink(ex.n)+'" target="_blank">📺 教学</a>'+
-      '<span class="ex-swap" data-i="'+i+'">🔄 替换</span></div>'+
-      '<div class="ex-tip"><b>要领：</b>'+ex.t+'</div>'+
-      '<div class="ex-progress"><span class="pr-label">上次</span><span class="pr-val">'+lastW+' · '+lastR+'</span>'+
-      '<input class="pr-w" type="number" placeholder="kg" min="0" step="0.5" value="'+(prog.weight||'')+'"><input class="pr-r" type="number" placeholder="次" min="0" value="'+(prog.reps||'')+'"><button class="pr-save" data-en="'+ex.n+'">记录</button>'+
-      '<span class="pr-chart" data-en="'+ex.n+'">📈 进步</span></div>';
-    // 勾选（打卡前可先填重量，勾选时自动记录到进步历史）
-    div.querySelector('.check').onclick=()=>{
-      const w=parseFloat(div.querySelector('.pr-w').value),r=parseInt(div.querySelector('.pr-r').value);
-      if(w&&r)recordExProgress(ex.n,w,r);
-      const t=profile().checkins[todayKey()]||{part:null,exercises:{}};
-      if(!t.exercises[curPart])t.exercises[curPart]={};
-      if(t.exercises[curPart][i])delete t.exercises[curPart][i];
-      else t.exercises[curPart][i]=true;
-      t.part=curPart;
-      profile().checkins[todayKey()]=t;
-      save();renderExercises();
-    };
-    // 替换按钮
-    div.querySelector('.ex-swap').onclick=()=>showSwapPicker(i,ex.n);
-    // 重量输入实时存草稿（勾选前即可填写）
-    const wInput=div.querySelector('.pr-w'),rInput=div.querySelector('.pr-r');
-    const saveDraft=()=>{
-      const w=parseFloat(wInput.value),r=parseInt(rInput.value);
-      if(!profile().exProgress)profile().exProgress={};
-      const p=profile().exProgress[ex.n]||{};
-      if(w)p.weight=w; if(r)p.reps=r; if(w||r)p.date=todayKey();
-      profile().exProgress[ex.n]=p; saveLocal();
-    };
-    wInput.addEventListener('input',saveDraft); rInput.addEventListener('input',saveDraft);
-    // 记录按钮 → 写入进步历史
-    div.querySelector('.pr-save').onclick=function(){
-      const w=parseFloat(this.parentElement.querySelector('.pr-w').value);
-      const r=parseInt(this.parentElement.querySelector('.pr-r').value);
-      if(!w||!r){showFoodHint('请先填写重量和次数');return;}
-      recordExProgress(this.dataset.en,w,r);
-      renderExercises();
-    };
-    // 进步曲线
-    div.querySelector('.pr-chart').onclick=()=>showProgressChart(ex.n);
-    list.appendChild(div);
+    const exCal=(ex.cal||0)*setsNum; totalCal+=exCal;
+    if(profile().checkins[todayKey()]?.exercises?.[curPart]?.[i])doneCal+=exCal;
   });
-  // 展开/收起按钮
-  if(exs.length>MAX_VISIBLE){
-    var btn=document.createElement('div');
-    btn.className='ex-expand';
-    btn.innerHTML=window._exExpanded?'▲ 收起更多 ('+exs.length+'个)':'▼ 展开更多 ('+exs.length+'个)';
-    btn.onclick=function(){window._exExpanded=!window._exExpanded;renderExercises();};
-    list.appendChild(btn);
+  updateExCalBar(totalCal,doneCal,exs.length);
+  // 长列表启用虚拟滚动，否则普通渲染
+  if(exs.length>EX_VT){
+    renderExVirtual(list,exs);
+  } else {
+    exitVirtual(list);
+    list.innerHTML='';
+    exs.forEach((ex,i)=>list.appendChild(buildExerciseCard(ex,i)));
   }
-  // 热量统计
-  var calBar=document.getElementById('calBar');
-  var calTotal=document.getElementById('calTotal');
-  var calDetail=document.getElementById('calDetail');
-  if(calBar&&totalCal>0){
-    calBar.style.display='block';
-    calTotal.textContent=doneCal+'/'+totalCal+'kcal';
-    calDetail.innerHTML='完成 '+doneCal+'kcal 共'+exs.length+'项';
+}
+function exitVirtual(list){
+  list.classList.remove('virtual');
+  list.style.position='';list.style.height='';
+  if(window._vTargets)window._vTargets.delete(list);
+  list._vExs=null;list._vHeights=null;list._vSig=null;list._vUpdate=null;
+}
+function renderExVirtual(list,exs){
+  list.classList.add('virtual');
+  if(!window._vTargets)window._vTargets=new Set();
+  window._vTargets.add(list);
+  if(!window._vScrollBound){
+    window._vScrollBound=true;
+    const onScroll=()=>{ if(window._vRAF)return; window._vRAF=requestAnimationFrame(()=>{window._vRAF=0; if(window._vTargets)window._vTargets.forEach(t=>{ if(t._vUpdate)t._vUpdate(); });}); };
+    window.addEventListener('scroll',onScroll,{passive:true});
+    window.addEventListener('resize',onScroll,{passive:true});
   }
+  const EST=150;
+  const sig=curPart+'#'+exs.length+'#'+JSON.stringify(profile().exSwaps||{});
+  let h=list._vSig===sig && list._vHeights ? list._vHeights : exs.map(()=>EST);
+  list._vHeights=h; list._vExs=exs; list._vSig=sig;
+  const sumArr=(a,s,e)=>{let t=0;for(let i=s;i<e;i++)t+=a[i];return t;};
+  list.style.position='relative';
+  list.style.height=sumArr(h,0,h.length)+'px';
+  function update(){
+    if(!list.offsetParent)return; // 页面隐藏时不渲染（避免无谓计算）
+    const vh=window.innerHeight;
+    const rect=list.getBoundingClientRect();
+    const listTopDoc=rect.top+window.scrollY;
+    const viewTop=window.scrollY, viewBot=window.scrollY+vh;
+    const lo=viewTop-listTopDoc-300, hi=viewBot-listTopDoc+300;
+    let acc=0,start=0;
+    for(let i=0;i<h.length;i++){ if(acc+h[i]>lo){start=i;break;} acc+=h[i]; }
+    let end=h.length, acc2=acc;
+    for(let i=start;i<h.length;i++){ if(acc2>hi){end=i;break;} acc2+=h[i]; }
+    list.innerHTML='';
+    for(let i=start;i<end;i++){
+      const card=buildExerciseCard(exs[i],i);
+      card.style.position='absolute';
+      card.style.left='0';card.style.right='0';
+      card.style.top=sumArr(h,0,i)+'px';
+      card.style.margin='0 2px';
+      list.appendChild(card);
+    }
+    // 测量真实高度后回填，保证滚动位置准确
+    requestAnimationFrame(()=>{
+      let changed=false;
+      const kids=list.children;
+      for(let j=0;j<kids.length;j++){
+        const idx=start+j; const hh=kids[j].offsetHeight+10;
+        if(Math.abs(hh-h[idx])>0.5){h[idx]=hh;changed=true;}
+      }
+      if(changed){ list.style.height=sumArr(h,0,h.length)+'px'; update(); }
+    });
+  }
+  list._vUpdate=update;
+  update();
 }
 
 /* 替换动作弹窗 */
@@ -1719,6 +1836,110 @@ function renderPartnerToday(){
     ${trainHTML}${dietHTML}${sportHTML}
   </div>`;
 }
+
+/* ===== 本周日历（双人/单人）+ 日弹窗 ===== */
+function weekDates(){
+  const d=new Date();d.setHours(0,0,0,0);
+  const day=(d.getDay()+6)%7; // 周一为一周起点
+  const mon=new Date(d);mon.setDate(d.getDate()-day);
+  const arr=[];
+  for(let i=0;i<7;i++){const x=new Date(mon);x.setDate(mon.getDate()+i);arr.push(x);}
+  return arr;
+}
+function dateKeyOf(d){return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');}
+
+function renderWeekGrid(id){
+  const el=document.getElementById(id);if(!el)return;
+  const dates=weekDates();
+  const labels=['一','二','三','四','五','六','日'];
+  const mode = id==='weekGridOv' ? 'both' : 'me';
+  let html='';
+  labels.forEach(l=>html+=`<div class="week-cell label">${l}</div>`);
+  const tk=todayKey();
+  const wk=['日','一','二','三','四','五','六'];
+  dates.forEach(d=>{
+    const k=dateKeyOf(d);
+    let cls='week-cell',icon='';
+    if(k===tk)cls+=' today';
+    if(mode==='both'){
+      const a=state.A.checkins[k]?.partChecked, b=state.B.checkins[k]?.partChecked;
+      if(a&&b){cls+=' doneAB';icon='🤝';}
+      else if(a){cls+=' doneA';icon='🏃';}
+      else if(b){cls+=' doneB';icon='🧘';}
+      else if(state.A.badminton[k]||state.B.badminton[k])icon='🏸';
+      else if(state.A.diet[k]||state.B.diet[k])icon='🍽';
+    } else {
+      const p=state[curProfile];
+      if(p.checkins[k]?.partChecked){cls+=' '+(curProfile==='A'?'doneA':'doneB');icon='💪';}
+      else if(p.badminton[k])icon='🏸';
+      else if(p.diet[k])icon='🍽';
+    }
+    html+=`<div class="${cls}" data-key="${k}" data-mode="${mode}"><span class="d">${d.getDate()}</span>`+(icon?`<span class="e">${icon}</span>`:'')+`</div>`;
+  });
+  el.innerHTML=html;
+  el.querySelectorAll('.week-cell[data-key]').forEach(cell=>{
+    const key=cell.dataset.key,m=cell.dataset.mode;
+    cell.addEventListener('mouseenter',()=>{window._dpHover=true;showDayPopup(key,cell,m);});
+    cell.addEventListener('mouseleave',()=>{window._dpHover=false;setTimeout(()=>{if(!window._dpHover&&!window._dpPin)hideDayPopup();},140);});
+    cell.addEventListener('click',e=>{e.stopPropagation();window._dpPin=true;showDayPopup(key,cell,m);});
+  });
+}
+
+function daySummaryHTML(p,k){
+  const pData=state[p];
+  const name=pData.name||('计划 '+p);
+  const emoji=p==='A'?'🏃':'🧘';
+  const color=p==='A'?'var(--pA)':'var(--pB)';
+  const c=pData.checkins[k];
+  let rows='';
+  if(c&&c.partChecked){
+    const parts=p==='A'?PARTS_A:PARTS_B;
+    const pi=parts.find(x=>x.key===c.part);
+    let done=0;
+    if(c.exercises&&c.exercises[c.part]){
+      Object.values(c.exercises[c.part]).forEach(lv=>{ if(typeof lv==='object')done+=Object.keys(lv).length; else if(lv)done++; });
+    }
+    rows+=`<div class="dp-row"><span>💪 训练</span><span class="dv">${pi?pi.emoji:''}${pi?pi.name:c.part} · ${done}项</span></div>`;
+  } else {
+    rows+=`<div class="dp-row"><span>💪 训练</span><span class="dv" style="color:var(--muted)">未打卡</span></div>`;
+  }
+  const diet=pData.diet[k];
+  const bf=(pData.breakfast?.[k]||[]).reduce((s,it)=>s+it.cal,0);
+  const ln=(pData.lunch?.[k]||[]).reduce((s,it)=>s+it.cal,0);
+  const dn=(pData.dinner?.[k]||[]).reduce((s,i)=>s+(DINNER_MENU[i]?.cal||0),0);
+  const eo=(pData.eatOut?.[k]||[]).reduce((s,it)=>s+it.cal,0);
+  const foodCal=bf+ln+dn+eo;
+  let dietTxt='';
+  if(diet)dietTxt=`<span class="dp-tag ${diet}">${diet==='low'?'低碳':'高碳'}</span>`;
+  rows+=`<div class="dp-row"><span>🍽 饮食</span><span class="dv">${diet?dietTxt:(foodCal?'—':'—')}${foodCal?foodCal+'kcal':''}</span></div>`;
+  let sport='';
+  const bd=pData.badminton[k];if(bd)sport+=`🏸${bd.duration}分 `;
+  const cardio=(pData.cardio?.[k]||[]);if(cardio.length)sport+=`🏃${cardio.length}项`;
+  rows+=`<div class="dp-row"><span>🏃 运动</span><span class="dv">${sport||'—'}</span></div>`;
+  const bw=pData.body?.[k]?.weight;if(bw)rows+=`<div class="dp-row"><span>⚖️ 体重</span><span class="dv">${bw}kg</span></div>`;
+  return `<div class="dp-prof"><div class="dp-pn"><span style="color:${color}">${emoji}</span>${name}</div>${rows}</div>`;
+}
+
+function showDayPopup(key,anchor,mode){
+  const pop=document.getElementById('dayPopup');
+  if(!pop)return;
+  const d=new Date(key+'T00:00:00');
+  const wk=['日','一','二','三','四','五','六'];
+  let body=`<div class="dp-date">📅 ${d.getMonth()+1}月${d.getDate()}日 周${wk[d.getDay()]}</div>`;
+  if(mode==='both'){ body+=daySummaryHTML('A',key)+daySummaryHTML('B',key); }
+  else { body+=daySummaryHTML(curProfile,key); }
+  pop.innerHTML=body;
+  pop.classList.add('show');
+  const r=anchor.getBoundingClientRect();
+  const pw=pop.offsetWidth, ph=pop.offsetHeight;
+  let left=r.left+r.width/2-pw/2;
+  let top=r.bottom+8;
+  if(left<8)left=8;
+  if(left+pw>window.innerWidth-8)left=window.innerWidth-8-pw;
+  if(top+ph>window.innerHeight-8){ top=r.top-ph-8; if(top<8)top=8; }
+  pop.style.left=left+'px'; pop.style.top=top+'px';
+}
+function hideDayPopup(){const p=document.getElementById('dayPopup');if(p)p.classList.remove('show');window._dpPin=false;}
 
 function renderAll(){
   renderTopbar();renderParts();renderExercises();renderBadminton();renderCardio();renderCalorieSummary();renderWater();renderWeekGrid('weekGrid');
@@ -2353,6 +2574,15 @@ setInterval(()=>{const n=new Date();if(n.getHours()===11&&n.getMinutes()<5)rende
 initSelectPage();
 /* 云端定时拉取（每30秒同步对方数据）*/
 setInterval(()=>{ if(_inApp&&cloudReady()&&!_syncing)doSync(null); }, 30000);
+
+/* 网络状态 → 同步图标（离线/恢复自动同步）*/
+if(typeof navigator!=='undefined'&&!navigator.onLine)setSyncStatus('offline');
+window.addEventListener('offline',()=>setSyncStatus('offline'));
+window.addEventListener('online',()=>{ if(cloudReady()){setSyncStatus('syncing');doSync(null,false);} else setSyncStatus('err'); });
+
+/* 日历日弹窗：点击空白处关闭（移动端）*/
+document.addEventListener('click',()=>{ if(window._dpPin)hideDayPopup(); });
+
 /* 隐藏 Loading */
 requestAnimationFrame(()=>{const l=document.getElementById('appLoader');if(l){l.classList.add('hide');setTimeout(()=>l.remove(),500)}});
 },0);

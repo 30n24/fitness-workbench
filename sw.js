@@ -1,7 +1,7 @@
-// 健身计划工作台 Service Worker - 离线缓存 v10
+// 健身计划工作台 Service Worker - 离线缓存 v11
 // 策略：HTML 文档「网络优先」（保证每次都系最新版）+ 其余静态资源「缓存优先 + 后台更新」
 //       离线/隧道失效时自动回退缓存，确保仍可用
-const CACHE_NAME = 'fitness-workbench-v10';
+const CACHE_NAME = 'fitness-workbench-v11';
 const CACHE_URLS = [
   './',
   './index.html',
@@ -31,6 +31,11 @@ self.addEventListener('activate', function(event) {
     })
   );
   self.clients.claim();
+});
+
+// 收到页面「跳过等待」指令后立即激活新版本（配合页面自动刷新）
+self.addEventListener('message', function(event) {
+  if (event.data && event.data.type === 'SKIP_WAITING') self.skipWaiting();
 });
 
 function isHtml(req){

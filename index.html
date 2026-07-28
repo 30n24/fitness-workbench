@@ -13,7 +13,7 @@
 <script>
 if('serviceWorker' in navigator){
   window.addEventListener('load',function(){
-    navigator.serviceWorker.register('./sw.js?v=6').then(function(reg){
+    navigator.serviceWorker.register('./sw.js?v=7').then(function(reg){
       console.log('SW registered:',reg.scope);
     }).catch(function(e){console.log('SW failed:',e)});
   });
@@ -244,20 +244,6 @@ main{padding:14px 14px 20px;max-width:680px;margin:0 auto}
 .meal-items .mi .save{color:var(--green);cursor:pointer;margin-left:4px;font-size:15px}
 .meal-total{font-size:12px;color:var(--muted);margin-top:8px;padding:8px 10px;background:var(--bg-2);border-radius:8px;display:flex;justify-content:space-between}
 .meal-total b{color:var(--orange)}
-/* 晚餐菜单选择 */
-.dinner-card{display:flex;flex-direction:column;gap:8px;margin:0 2px 12px}
-.dinner-opt{display:flex;align-items:center;gap:10px;padding:12px 14px;border-radius:12px;background:var(--card);border:2px solid var(--border);cursor:pointer;transition:.2s}
-.dinner-opt:active{transform:scale(.98)}
-.dinner-opt.selected{border-color:var(--green);background:linear-gradient(135deg,rgba(52,211,153,.1),var(--card))}
-.dinner-opt .dname{font-size:14px;font-weight:600;flex:1}
-.dinner-opt .dcal{font-size:11px;color:var(--orange);font-weight:600}
-.dinner-opt .dcarb{font-size:10px;color:var(--accent)}
-.dinner-opt .dcheck{width:22px;height:22px;border-radius:50%;border:2px solid var(--border);flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:12px;color:transparent;transition:.18s}
-.dinner-opt.selected .dcheck{background:var(--green);border-color:var(--green);color:#fff}
-.dinner-opt .dtag{font-size:10px;padding:2px 6px;border-radius:5px;background:var(--bg-2);color:var(--muted)}
-/* 同步提示 */
-.dinner-partner{background:linear-gradient(135deg,rgba(244,114,182,.1),rgba(91,140,255,.05));border:1px solid rgba(244,114,182,.25);border-radius:12px;padding:10px 13px;margin:0 2px 12px;font-size:12px;color:var(--text);display:flex;align-items:center;gap:8px}
-.dinner-partner .pn{font-weight:700;color:var(--pink)}
 /* 饮食汇总 */
 .diet-summary{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:14px;margin:0 2px 12px}
 .diet-summary .ds-row{display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid var(--border);font-size:13px}
@@ -740,10 +726,16 @@ html.dark .dash-card{background:#171f30}
     <div class="meal-total" id="lunchTotal"></div>
   </div>
 
-  <div class="section-title">🍽️ 晚餐（菜单选择）</div>
-  <div class="dinner-card" id="dinnerCard"></div>
+  <div class="section-title">🍽️ 晚餐（自主输入）</div>
+  <div class="meal-input-card">
+    <div class="meal-row">
+      <input type="text" id="dinnerInput" placeholder="食物+份量，如：番茄豆腐鸡蛋 / 150g鸡胸肉 / 丝瓜炒肉" list="foodList">
+      <button class="meal-add-btn" id="dinnerAdd">添加</button>
+    </div>
+    <div class="meal-items" id="dinnerItems"></div>
+    <div class="meal-total" id="dinnerTotal"></div>
+  </div>
   <div id="dinnerPartner" style="display:none;margin:0 2px 12px"></div>
-  <div class="meal-total" id="dinnerTotal"></div>
 
   <div class="section-title">📊 今日饮食汇总</div>
   <div class="diet-summary" id="dietSummary"></div>
@@ -1508,6 +1500,7 @@ function enterApp(){
   window._exSearch='';
   const sx=document.getElementById('exSearch'); if(sx)sx.value='';
   applyProfileTheme();
+  migrateDinner();
   renderAll();
   // 进入后拉取对方最新数据
   if(cloudReady()){
@@ -2192,6 +2185,15 @@ const FOOD_DB=[
   {n:'可乐',cal:43,u:'100ml',carb:11},{n:'橙汁',cal:45,u:'100ml',carb:10},{n:'蛋白粉',cal:380,u:'100g',carb:10},
   {n:'西兰花',cal:34,u:'100g',carb:7},{n:'菠菜',cal:23,u:'100g',carb:4},{n:'黄瓜',cal:16,u:'100g',carb:3},
   {n:'番茄',cal:18,u:'100g',carb:4},{n:'西红柿',cal:18,u:'100g',carb:4},{n:'生菜',cal:15,u:'100g',carb:3},
+  {n:'丝瓜',cal:18,u:'100g',carb:4},{n:'茄子',cal:25,u:'100g',carb:6},{n:'包菜',cal:25,u:'100g',carb:6},
+  {n:'大白菜',cal:13,u:'100g',carb:3},{n:'芹菜',cal:16,u:'100g',carb:3},{n:'空心菜',cal:19,u:'100g',carb:3},
+  {n:'胡萝卜',cal:41,u:'100g',carb:10},{n:'菜心',cal:20,u:'100g',carb:2},{n:'节瓜',cal:18,u:'100g',carb:4},
+  {n:'莲藕',cal:74,u:'100g',carb:17},{n:'苦瓜',cal:19,u:'100g',carb:4},{n:'冬瓜',cal:12,u:'100g',carb:3},
+  {n:'白萝卜',cal:16,u:'100g',carb:4},  {n:'蘑菇',cal:22,u:'100g',carb:3},{n:'白菜',cal:13,u:'100g',carb:3},
+  {n:'猪扒',cal:250,u:'100g',carb:0},{n:'五花肉',cal:520,u:'100g',carb:0},
+  {n:'羊肉',cal:203,u:'100g',carb:0},{n:'鸭肉',cal:240,u:'100g',carb:0},{n:'鸡肉',cal:165,u:'100g',carb:0},
+  {n:'鸡翅',cal:220,u:'100g',carb:0},{n:'蟹',cal:95,u:'100g',carb:1},{n:'瘦肉',cal:143,u:'100g',carb:0},
+  {n:'豆腐干',cal:140,u:'100g',carb:5},{n:'腐竹',cal:459,u:'100g',carb:11},
   {n:'牛油果',cal:160,u:'个',carb:9},{n:'蓝莓',cal:57,u:'100g',carb:14},{n:'坚果',cal:607,u:'100g',carb:20},
   {n:'杏仁',cal:579,u:'100g',carb:22},{n:'蛋白棒',cal:200,u:'根',carb:20},{n:'能量棒',cal:200,u:'根',carb:25}
 ];
@@ -2201,7 +2203,16 @@ const FOOD_ALIAS={
   '薯仔':'土豆','马铃薯':'土豆',
   '牛乳':'牛奶',
   '提子':'葡萄','奇异果':'猕猴桃','士多啤梨':'草莓','车厘子':'樱桃',
-  '鸡旦':'鸡蛋','鸡疍':'鸡蛋'
+  '鸡旦':'鸡蛋','鸡疍':'鸡蛋',
+  /* 蔬菜·粤语/俗名 */
+  '胜瓜':'丝瓜','矮瓜':'茄子','椰菜':'包菜','绍菜':'大白菜','黄芽白':'大白菜',
+  '唐芹':'芹菜','西芹':'芹菜','通菜':'空心菜','蕹菜':'空心菜','红萝卜':'胡萝卜',
+  '青瓜':'黄瓜','翠肉瓜':'节瓜','凉瓜':'苦瓜','天津白':'白菜',
+  /* 肉品·粤语/俗名 */
+  '豬肉':'猪肉','豬扒':'猪扒','豬排':'猪扒','五花腩':'五花肉',
+  '雞肉':'鸡肉','雞胸':'鸡胸肉','雞腿':'鸡腿肉','雞髀':'鸡腿肉','雞翼':'鸡翅','雞中翼':'鸡翅',
+  '牛柳':'牛肉','牛脷':'牛肉','肉碎':'猪肉','猪颈肉':'猪肉','烧肉':'猪肉',
+  '肉':'猪肉','鱼':'鱼肉'
 };
 const DINNER_MENU=[
   {n:'清蒸鱼 + 时蔬',cal:280,carb:12,tag:'low'},{n:'香煎鸡胸 + 芦笋',cal:320,carb:8,tag:'low'},
@@ -2209,44 +2220,50 @@ const DINNER_MENU=[
   {n:'虾仁炒西兰花',cal:260,carb:12,tag:'low'},{n:'杂粮粥 + 蒸蛋',cal:300,carb:38,tag:'high'},
   {n:'番茄牛腩 + 米饭',cal:520,carb:55,tag:'high'},{n:'烤三文鱼 + 红薯',cal:430,carb:30,tag:'high'}
 ];
-function findFood(q){
-  q=(q||'').trim();
-  if(!q)return null;
-  for(const k in FOOD_ALIAS){ if(q.indexOf(k)>=0) q=q.split(k).join(FOOD_ALIAS[k]); }
+function buildFoodTerms(){
   const custom=profile().foods||[];
-  const all=FOOD_DB.concat(custom);
-  let best=null,bestScore=0;
-  for(const f of all){
-    if(f.n===q)return f;
-    if(f.n.indexOf(q)>=0||q.indexOf(f.n)>=0){const s=Math.min(f.n.length,q.length);if(s>bestScore){bestScore=s;best=f;}}
-  }
-  if(!best){
-    for(const f of all){
-      let ov=0;for(const ch of q){if(f.n.indexOf(ch)>=0)ov++;}
-      const s=ov/q.length;if(s>0.6&&s>bestScore){bestScore=s;best=f;}
-    }
-  }
-  return best;
-}
-function parseQty(text){
-  const m=text.match(/(\d+(?:\.\d+)?)\s*(个|根|只|片|碗|杯|块|份|把|颗|串|ml|g|克|毫升)?/i);
-  if(m)return {qty:parseFloat(m[1])||1,unit:(m[2]||'').toLowerCase()};
-  return {qty:1,unit:''};
+  const db=FOOD_DB.concat(custom);
+  const map={}; db.forEach(f=>{map[f.n]={name:f.n,cal:f.cal,carb:(f.carb||0),u:f.u};});
+  const terms=[];
+  db.forEach(f=>terms.push({term:f.n,name:f.n,cal:f.cal,carb:(f.carb||0),u:f.u}));
+  for(const a in FOOD_ALIAS){ const c=map[FOOD_ALIAS[a]]; if(c) terms.push({term:a,name:c.name,cal:c.cal,carb:c.carb,u:c.u}); }
+  terms.sort((x,y)=>y.term.length-x.term.length);
+  return terms;
 }
 function calcByQty(food,qty){
   if(food.u==='100g'||food.u==='100ml')return food.cal*(qty/100);
   return food.cal*qty;
 }
+/* 分词式识别：将一段自由文本拆成多个食物并累加热量/碳水
+   例：「番茄豆腐鸡蛋」→ 番茄+豆腐+鸡蛋；「胜瓜炒肉」→ 丝瓜(胜瓜)+猪肉(肉碎) */
 function matchFoodCal(text){
   text=(text||'').trim();
-  const {qty}=parseQty(text);
-  let name=text.replace(/^(\d+(?:\.\d+)?)\s*(个|根|只|片|碗|杯|块|份|把|颗|串|ml|g|克|毫升)?\s*/i,'').trim();
-  if(!name)name=text;
-  const food=findFood(name);
-  if(!food)return {cal:0,carb:0,matched:'',fuzzy:true};
-  const cal=Math.round(calcByQty(food,qty));
-  const carb=Math.round((food.carb||0)*(food.u==='100g'||food.u==='100ml'?qty/100:qty));
-  return {cal,carb,matched:food.n,fuzzy:false};
+  if(!text)return {cal:0,carb:0,matched:'',fuzzy:true,parts:[]};
+  const terms=buildFoodTerms();
+  let i=0,parts=[],unmatched='',totalCal=0,totalCarb=0;
+  while(i<text.length){
+    const ch=text[i];
+    if(/\s|[，,、;；:：.。·]/.test(ch)){i++;continue;}
+    // 可选份量前缀（作用于紧随其后的食物）
+    let qty=1,explicit=false,j=i;
+    const qm=text.slice(i).match(/^(\d+(?:\.\d+)?)\s*(个|根|只|片|碗|杯|块|份|把|颗|串|ml|g|克|毫升|两|斤)?/i);
+    if(qm){qty=parseFloat(qm[1])||1;explicit=true;j=i+qm[0].length;}
+    // 从该位置贪心匹配最长食物名（含方言别名）
+    let best=null;
+    for(const t of terms){ if(t.term.length && text.startsWith(t.term,j)){best=t;break;} }
+    if(best){
+      // 未显式给份量且食物按 100g/ml 计，则默认一份=100g/ml
+      const serve=(!explicit && (best.u==='100g'||best.u==='100ml'))?100:qty;
+      const cal=Math.round(calcByQty(best,serve));
+      const carb=Math.round((best.carb||0)*(best.u==='100g'||best.u==='100ml'?serve/100:serve));
+      parts.push({name:best.name,qty:serve,cal,carb});
+      totalCal+=cal;totalCarb+=carb;
+      i=j+best.term.length;
+    } else { unmatched+=text[i]; i++; }
+  }
+  const matchedNames=parts.map(p=>p.name);
+  const fuzzy = parts.length===0 || unmatched.length>0;
+  return {cal:totalCal,carb:totalCarb,matched:matchedNames.join('、'),fuzzy,parts};
 }
 let _hintTimer;
 function showFoodHint(msg){
@@ -2292,26 +2309,25 @@ function renderMeal(kind,itemsId,totalId){
 function renderBreakfast(){renderMeal('breakfast','breakfastItems','breakfastTotal');}
 function renderLunch(){renderMeal('lunch','lunchItems','lunchTotal');}
 function renderDinner(){
-  const k=todayKey();
-  const sel=profile().dinner?.[k]||[];
-  const el=document.getElementById('dinnerCard');el.innerHTML='';
-  DINNER_MENU.forEach((m,i)=>{
-    const div=document.createElement('div');div.className='dinner-opt'+(sel.includes(i)?' selected':'');
-    div.innerHTML=`<div class="dname">${m.n}</div><div class="dcal">${m.cal}kcal</div><div class="dcarb">${m.carb}g碳</div><div class="dcheck">✓</div>`;
-    div.onclick=()=>{const a=profile().dinner[k]||[];const idx=a.indexOf(i);if(idx>=0)a.splice(idx,1);else a.push(i);profile().dinner[k]=a;save();renderDinner();renderDietSummary();};
-    el.appendChild(div);
+  renderMeal('dinner','dinnerItems','dinnerTotal');
+}
+/* 旧版晚餐以"菜单序号"存储，迁移为与早/午餐一致的条目对象 */
+function migrateDinner(){
+  ['A','B'].forEach(p=>{
+    const d=state[p].dinner; if(!d)return;
+    Object.keys(d).forEach(k=>{
+      if(Array.isArray(d[k]) && d[k].some(x=>typeof x==='number')){
+        d[k]=d[k].map(x=>(typeof x==='number')?{name:DINNER_MENU[x]?.n||('晚餐'+(x+1)),cal:DINNER_MENU[x]?.cal||0,carb:DINNER_MENU[x]?.carb||0}:x);
+        save();
+      }
+    });
   });
-  const pp=curProfile==='A'?'B':'A';
-  const pd=state[pp].dinner?.[k]||[];
-  const pEl=document.getElementById('dinnerPartner');
-  if(pd.length){pEl.style.display='flex';pEl.innerHTML=`<span>👀</span><span><b class="pn">${state[pp].name||('计划'+pp)}</b> 今晚：${pd.map(i=>DINNER_MENU[i]?.n).join('、')}</span>`;}
-  else pEl.style.display='none';
 }
 function renderDietSummary(){
   const k=todayKey();
   const bf=(profile().breakfast?.[k]||[]).reduce((s,it)=>s+it.cal,0);
   const ln=(profile().lunch?.[k]||[]).reduce((s,it)=>s+it.cal,0);
-  const dn=(profile().dinner?.[k]||[]).reduce((s,i)=>s+(DINNER_MENU[i]?.cal||0),0);
+  const dn=(profile().dinner?.[k]||[]).reduce((s,it)=>s+((typeof it==='object'?it.cal:(DINNER_MENU[it]?.cal||0))||0),0);
   const eo=(profile().eatOut?.[k]||[]).reduce((s,it)=>s+it.cal,0);
   const total=bf+ln+dn+eo;
   document.getElementById('dietSummary').innerHTML=
@@ -2320,13 +2336,19 @@ function renderDietSummary(){
     `<div class="ds-row"><span>🍽️ 晚餐</span><span class="ds-v">${dn}kcal</span></div>`+
     (eo?`<div class="ds-row"><span>🍴 外食</span><span class="ds-v">${eo}kcal</span></div>`:'')+
     `<div class="ds-row total"><span>今日总热量</span><span class="ds-v">${total}kcal</span></div>`;
+  // 对方今晚吃了什么（兼容旧版"菜单序号"与新版"自主输入条目"）
+  const pp=curProfile==='A'?'B':'A';
+  const pd=(state[pp].dinner?.[k]||[]).map(x=>(typeof x==='object'?x.name:(DINNER_MENU[x]?.n||''))).filter(Boolean);
+  const pEl=document.getElementById('dinnerPartner');
+  if(pd.length){pEl.style.display='flex';pEl.innerHTML=`<span>👀</span><span><b class="pn">${state[pp].name||('计划'+pp)}</b> 今晚：${pd.join('、')}</span>`;}
+  else pEl.style.display='none';
   renderCalorieSummary();
 }
 function renderCalorieSummary(){
   const k=todayKey();
   const bf=(profile().breakfast?.[k]||[]).reduce((s,it)=>s+it.cal,0);
   const ln=(profile().lunch?.[k]||[]).reduce((s,it)=>s+it.cal,0);
-  const dn=(profile().dinner?.[k]||[]).reduce((s,i)=>s+(DINNER_MENU[i]?.cal||0),0);
+  const dn=(profile().dinner?.[k]||[]).reduce((s,it)=>s+((typeof it==='object'?it.cal:(DINNER_MENU[it]?.cal||0))||0),0);
   const eo=(profile().eatOut?.[k]||[]).reduce((s,it)=>s+it.cal,0);
   const foodCal=bf+ln+dn+eo;
   const CARDIO_CAL_S={'慢跑':9,'爬坡':11,'快跑':13,'滑雪机':12,'划船机':10,'椭圆机':8,'动感单车':10,'跳绳':12,'爬楼梯':11};
@@ -2642,6 +2664,19 @@ document.getElementById('lunchAdd').onclick=()=>{
   document.getElementById('lunchInput').value='';
   renderLunch();renderDietSummary();
   if(info.fuzzy) showFoodHint(info.matched?('「'+name+'」自动匹配为「'+info.matched+'」('+info.cal+'kcal)，如不准可点✎修正'):('「'+name+'」未识别，按'+info.cal+'kcal估算，可点✎手动修正'));
+};
+// 晚餐添加（自主输入，支持多食物分词识别）
+document.getElementById('dinnerAdd').onclick=()=>{
+  const name=document.getElementById('dinnerInput').value.trim();
+  if(!name)return;
+  const info=matchFoodCal(name);
+  if(!profile().dinner)profile().dinner={};
+  if(!profile().dinner[todayKey()])profile().dinner[todayKey()]=[];
+  profile().dinner[todayKey()].push({name,cal:info.cal,carb:info.carb,matched:info.matched||''});
+  save();
+  document.getElementById('dinnerInput').value='';
+  renderDinner();renderDietSummary();
+  if(info.fuzzy) showFoodHint(info.matched?('「'+name+'」识别为：'+info.matched+'('+info.cal+'kcal)，如不准可点✎修正'):('「'+name+'」未识别到食物，按'+info.cal+'kcal估算，可点✎手动修正'));
 };
 let noteTimer;
 document.getElementById('dietNote').addEventListener('input',e=>{

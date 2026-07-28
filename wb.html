@@ -1888,40 +1888,66 @@ function renderExercises(){
 function renderExerciseCards(list, exs, mainIdx, suppIdx, showSupp, isSearching){
   exitVirtual(list);
   list.innerHTML='';
-  // 展开补充时唔重复显示主5个（收起时才显示主5）
-  if (!showSupp) mainIdx.forEach(i=>list.appendChild(buildExerciseCard(exs[i], i)));
+  // 主要动作（5个）——始终显示，展开时唔重新渲染，保持原位
+  mainIdx.forEach(i=>list.appendChild(buildExerciseCard(exs[i], i)));
   // 补充动作折叠
   if (suppIdx.length > 0 && !isSearching) {
     const toggle = document.createElement('div');
     toggle.className='ex-supp-toggle'+(showSupp?' open':'');
     toggle.innerHTML='<span>'+(showSupp?'🔼 收起补充 ('+suppIdx.length+'个)':'📂 展开补充 ('+suppIdx.length+'个)')+'</span>';
     toggle.onclick=function(){
-      window._exSuppOpen = showSupp ? '' : curPart;
-      renderExercises();
+      const expanded = window._exSuppOpen === curPart;
+      window._exSuppOpen = expanded ? '' : curPart;
+      const body = list.querySelector('.ex-supp-body');
+      if (!body) return;
+      if (expanded) {
+        body.style.display = 'none';
+        this.classList.remove('open');
+        this.querySelector('span').textContent = '📂 展开补充 ('+suppIdx.length+'个)';
+      } else {
+        if (body.children.length === 0) {
+          suppIdx.forEach(j=>{
+            const card = buildExerciseCard(exs[j], j);
+            const swapBtn = document.createElement('span');
+            swapBtn.className = 'ex-main-in';
+            swapBtn.textContent = '⬆ 换入主要';
+            swapBtn.onclick = function(){
+              const order = profile().exMainOrder[curPart].slice();
+              const mainPos = Math.min(EX_MAIN_COUNT, order.length)-1;
+              const suppPos = order.indexOf(j);
+              if (suppPos > mainPos) { order[suppPos] = order[mainPos]; order[mainPos] = j; }
+              profile().exMainOrder[curPart] = order; save(); renderExercises();
+            };
+            card.querySelector('.ex-meta').appendChild(swapBtn);
+            body.appendChild(card);
+          });
+        }
+        body.style.display = '';
+        this.classList.add('open');
+        this.querySelector('span').textContent = '🔼 收起补充 ('+suppIdx.length+'个)';
+      }
     };
     list.appendChild(toggle);
+    // 补充容器（初始按 showSupp 决定显示/隐藏）
+    const body = document.createElement('div');
+    body.className = 'ex-supp-body';
+    body.style.display = showSupp ? '' : 'none';
+    list.appendChild(body);
     if (showSupp) {
       suppIdx.forEach(j=>{
         const card = buildExerciseCard(exs[j], j);
-        // 加「⬆ 换入主要」按钮
         const swapBtn = document.createElement('span');
-        swapBtn.className='ex-main-in';
-        swapBtn.textContent='⬆ 换入主要';
-        swapBtn.onclick=function(){
+        swapBtn.className = 'ex-main-in';
+        swapBtn.textContent = '⬆ 换入主要';
+        swapBtn.onclick = function(){
           const order = profile().exMainOrder[curPart].slice();
-          // 搵到呢个补充动作喺顺序中的位置，同第5个主要互换
-          const mainPos = Math.min(EX_MAIN_COUNT, order.length) - 1; // 第5个位置 index=4
+          const mainPos = Math.min(EX_MAIN_COUNT, order.length)-1;
           const suppPos = order.indexOf(j);
-          if (suppPos > mainPos) {
-            order[suppPos] = order[mainPos];
-            order[mainPos] = j;
-          }
-          profile().exMainOrder[curPart] = order;
-          save();
-          renderExercises();
+          if (suppPos > mainPos) { order[suppPos] = order[mainPos]; order[mainPos] = j; }
+          profile().exMainOrder[curPart] = order; save(); renderExercises();
         };
         card.querySelector('.ex-meta').appendChild(swapBtn);
-        list.appendChild(card);
+        body.appendChild(card);
       });
     }
   }

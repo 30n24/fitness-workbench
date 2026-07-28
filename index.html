@@ -337,6 +337,20 @@ main{padding:14px 14px 20px;max-width:680px;margin:0 auto}
 .tabbar button .ico{font-size:20px}
 .tabbar button.active.pA{color:var(--pA)}
 .tabbar button.active.pB{color:var(--pB)}
+/* 拍照日记 */
+.photo-take{padding:6px 14px;border-radius:10px;background:var(--primary);color:#fff;font-size:13px;font-weight:600;border:none;flex-shrink:0}
+.photo-take:active{transform:scale(.94)}
+.photo-stats{font-size:11px;color:var(--muted);margin-bottom:10px}
+.photo-grid{display:flex;flex-wrap:wrap;gap:8px;padding-bottom:80px}
+.photo-card{width:calc(50% - 4px);border-radius:10px;overflow:hidden;background:var(--card);border:1px solid var(--border);position:relative}
+.photo-card img{width:100%;height:auto;display:block;aspect-ratio:3/4;object-fit:cover;background:var(--bg-2)}
+.photo-card .pc-meta{display:flex;align-items:center;justify-content:space-between;padding:6px 8px;font-size:11px;color:var(--muted)}
+.photo-card .pc-del{color:var(--red);font-size:13px;cursor:pointer;padding:2px}
+.photo-card .pc-label{position:absolute;top:6px;left:6px;font-size:9px;padding:2px 6px;border-radius:4px;background:rgba(0,0,0,.55);color:#fff;font-weight:600}
+.photo-modal{position:fixed;inset:0;z-index:50;background:rgba(0,0,0,.85);display:flex;align-items:center;justify-content:center;padding:20px}
+.photo-modal img{max-width:100%;max-height:80vh;border-radius:10px}
+.photo-modal .pm-close{position:absolute;top:16px;right:16px;font-size:22px;color:#fff;cursor:pointer;width:36px;height:36px;display:flex;align-items:center;justify-content:center;background:rgba(255,255,255,.15);border-radius:50%}
+.photo-empty{text-align:center;padding:60px 20px;font-size:13px;color:var(--muted)}
 
 .page{display:none;animation:fade .25s}
 .page.active{display:block}
@@ -882,12 +896,25 @@ html.dark .dash-card{background:#171f30}
   </div>
 </main>
 
+<!-- 相册页 -->
+<main class="page" id="page-photos">
+  <div class="section-title" style="display:flex;align-items:center;justify-content:space-between">
+    📸 拍照日记
+    <button class="photo-take" id="photoTakeBtn">📷 拍照</button>
+  </div>
+  <input type="file" id="photoInput" accept="image/*" capture="environment" style="display:none">
+  <div class="photo-stats" id="photoStats"></div>
+  <div class="photo-grid" id="photoGrid"></div>
+  <div class="photo-empty" id="photoEmpty">暂无照片，点击上方「📷 拍照」记录身形变化</div>
+</main>
+
 <div class="tabbar">
   <button class="active" data-page="train"><span class="ico">💪</span>训练</button>
   <button data-page="diet"><span class="ico">🍽️</span>饮食</button>
   <button data-page="body"><span class="ico">📏</span>身体</button>
   <button data-page="expenses"><span class="ico">💰</span>记账</button>
   <button data-page="stats"><span class="ico">📊</span>概览</button>
+  <button data-page="photos"><span class="ico">📸</span>相册</button>
 </div>
 </div>
 
@@ -2354,6 +2381,7 @@ function switchPage(p){
   if(p==='body')renderBody();
   if(p==='stats')renderStats();
   if(p==='expenses')renderExpenses();
+  if(p==='photos')renderPhotos();
   window.scrollTo(0,0);
 }
 
@@ -2851,6 +2879,107 @@ function generateReport(){
   if(bpts.length>=2)drawLineChart(cv,bpts,'#22d3ee','kg');else cv.style.display='none';
 }
 
+/* ===== 拍照日记（IndexedDB 储存 + Canvas 压缩）===== */
+const PHOTO_DB='fitness_photos_v1';
+let _phDB=null;
+function openPhotoDB(){return new Promise((rs,rj)=>{
+  if(_phDB)return rs(_phDB);
+  const r=indexedDB.open(PHOTO_DB,1);
+  r.onupgradeneeded=e=>{const db=e.target.result;if(!db.objectStoreNames.contains('photos'))db.createObjectStore('photos',{keyPath:'id'});};
+  r.onsuccess=e=>{_phDB=e.target.result;rs(_phDB);};
+  r.onerror=e=>rj(e.target.error);
+})}
+async function addPhoto(data,angle){
+  const db=await openPhotoDB();
+  const tx=db.transaction('photos','readwrite');
+  tx.objectStore('photos').add({id:Date.now(),profile:curProfile,date:recKey(),angle:angle||'',data,timestamp:Date.now()});
+  return new Promise(rs=>{tx.oncomplete=()=>rs();});
+}
+async function getPhotos(profile){
+  const db=await openPhotoDB();
+  const all=[];
+  return new Promise(rs=>{
+    const tx=db.transaction('photos','readonly');
+    const cur=tx.objectStore('photos').openCursor();
+    cur.onsuccess=e=>{const c=e.target.result;if(c){all.push(c.value);c.continue();}else{const f=all.filter(p=>p.profile===profile).sort((a,b)=>b.timestamp-a.timestamp);rs(f);}};
+  });
+}
+async function delPhoto(id){
+  const db=await openPhotoDB();
+  const tx=db.transaction('photos','readwrite');
+  tx.objectStore('photos').delete(id);
+  return new Promise(rs=>{tx.oncomplete=()=>rs();});
+}
+async function getPhotoSize(){
+  const db=await openPhotoDB();
+  let total=0;
+  return new Promise(rs=>{
+    const tx=db.transaction('photos','readonly');
+    const cur=tx.objectStore('photos').openCursor();
+    cur.onsuccess=e=>{const c=e.target.result;if(c){total+=c.value.data.length;c.continue();}else rs(Math.round(total/1024));};
+  });
+}
+function compressPhoto(file,cb){
+  const img=new Image();
+  const url=URL.createObjectURL(file);
+  img.onload=()=>{
+    URL.revokeObjectURL(url);
+    const MAX=1080;
+    let w=img.width,h=img.height;
+    if(w>MAX||h>MAX){if(w>h){h=h*MAX/w;w=MAX;}else{w=w*MAX/h;h=MAX;}}
+    const c=document.createElement('canvas');c.width=w;c.height=h;
+    const ctx=c.getContext('2d');
+    ctx.drawImage(img,0,0,w,h);
+    c.toBlob(b=>{
+      const reader=new FileReader();
+      reader.onload=()=>cb(reader.result);
+      reader.readAsDataURL(b);
+    },'image/jpeg',0.8);
+  };
+  img.src=url;
+}
+async function renderPhotos(){
+  document.getElementById('photoGrid').innerHTML='';
+  const photos=await getPhotos(curProfile);
+  const empty=document.getElementById('photoEmpty');
+  const grid=document.getElementById('photoGrid');
+  const stats=document.getElementById('photoStats');
+  if(!photos.length){empty.style.display='';grid.style.display='none';stats.textContent='';return;}
+  empty.style.display='none';grid.style.display='';
+  const totalKB=await getPhotoSize();
+  const mb=(totalKB/1024).toFixed(1);
+  stats.textContent='共 '+photos.length+' 张 · 占用 '+mb+' MB';
+  // 按月份分组
+  const groups={};
+  photos.forEach(p=>{
+    const m=p.date.slice(0,7);
+    if(!groups[m])groups[m]=[];
+    groups[m].push(p);
+  });
+  Object.keys(groups).sort().reverse().forEach(m=>{
+    const h=document.createElement('div');h.style.cssText='width:100%;font-size:12px;font-weight:700;color:var(--muted);padding:4px 0';
+    h.textContent=m;
+    grid.appendChild(h);
+    groups[m].forEach(p=>{
+      const card=document.createElement('div');card.className='photo-card';
+      card.innerHTML='<img src="'+p.data+'" loading="lazy" data-id="'+p.id+'" data-angle="'+p.angle+'"><div class="pc-label">'+p.angle+'</div><div class="pc-meta"><span>'+p.date.slice(5)+'</span><span class="pc-del" data-id="'+p.id+'">✕</span></div>';
+      card.querySelector('img').onclick=function(){
+        const overlay=document.createElement('div');overlay.className='photo-modal';
+        overlay.innerHTML='<span class="pm-close">✕</span><img src="'+this.src+'">';
+        overlay.querySelector('.pm-close').onclick=()=>overlay.remove();
+        overlay.onclick=e=>{if(e.target===overlay)overlay.remove();};
+        document.body.appendChild(overlay);
+      };
+      card.querySelector('.pc-del').onclick=async function(e){
+        e.stopPropagation();
+        if(!confirm('删除这张照片？'))return;
+        await delPhoto(parseInt(this.dataset.id));
+        renderPhotos();
+      };
+      grid.appendChild(card);
+    });
+  });
+}
 /* ===== 事件 ===== */
 // levels removed
 // 低碳/高碳勾选事件
@@ -3007,6 +3136,23 @@ document.getElementById('dietNote').addEventListener('input',e=>{
   clearTimeout(noteTimer);
   noteTimer=setTimeout(()=>{profile().notes[recKey()]=e.target.value;save()},300);
 });
+
+/* 拍照事件 */
+document.getElementById('photoTakeBtn').onclick=()=>document.getElementById('photoInput').click();
+const _phInput=document.getElementById('photoInput');
+_phInput.onchange=function(){
+  const file=this.files&&this.files[0];
+  if(!file)return;
+  // 询问角度
+  const angle=prompt('选择角度：\n1 = 正面\n2 = 侧面\n3 = 背面','1');
+  const label={'1':'正面','2':'侧面','3':'背面','正面':'正面','侧面':'侧面','背面':'背面'}[angle]||'正面';
+  compressPhoto(file,async data=>{
+    await addPhoto(data,label);
+    showFoodHint('✅ 照片已保存 ('+label+')');
+    _phInput.value='';
+    if(curPage==='photos')renderPhotos();
+  });
+};
 
 /* 记账事件 */
 document.getElementById('expPrevDay').onclick=()=>{curExpDate.setDate(curExpDate.getDate()-1);renderExpenses()};

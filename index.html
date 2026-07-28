@@ -1888,8 +1888,8 @@ function renderExercises(){
 function renderExerciseCards(list, exs, mainIdx, suppIdx, showSupp, isSearching){
   exitVirtual(list);
   list.innerHTML='';
-  // 主要动作（5个）
-  mainIdx.forEach(i=>list.appendChild(buildExerciseCard(exs[i], i)));
+  // 展开补充时唔重复显示主5个（收起时才显示主5）
+  if (!showSupp) mainIdx.forEach(i=>list.appendChild(buildExerciseCard(exs[i], i)));
   // 补充动作折叠
   if (suppIdx.length > 0 && !isSearching) {
     const toggle = document.createElement('div');

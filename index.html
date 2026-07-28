@@ -11,27 +11,13 @@
 <title>健身计划工作台</title>
 <!-- PWA: 注册 Service Worker 实现离线缓存（隧道失效后仍可离线使用） -->
 <script>
+// 彻底取消 Service Worker：主动注销已安装嘅旧 SW，并唔再注册。
+// 原因：你嘅网络环境（隧道）下，SW 直接 fetch 源站会失败并 serve 旧缓存，
+//       导致刷新后显示旧版。取消 SW 后页面每次直接攞服务器最新 HTML，唔会再被旧缓存卡。
 if('serviceWorker' in navigator){
-  let _swPendingReload=false;
-  window.addEventListener('load',function(){
-    navigator.serviceWorker.register('./sw.js?v=13').then(function(reg){
-      // 已有等待中的新版本，立即激活
-      if(reg.waiting){_swPendingReload=true;reg.waiting.postMessage({type:'SKIP_WAITING'});}
-      reg.onupdatefound=function(){
-        const installing=reg.installing;
-        installing.onstatechange=function(){
-          if(installing.state==='installed'){
-            // 旧 SW 仍在控制页面时才自动跳过等待并刷新
-            if(navigator.serviceWorker.controller){_swPendingReload=true;installing.postMessage({type:'SKIP_WAITING'});}
-          }
-        };
-      };
-    }).catch(function(e){console.log('SW failed:',e)});
-  });
-  // 新 SW 接管后自动刷新，确保显示最新版（唔使再手动 ?r=1 / 清缓存）
-  navigator.serviceWorker.addEventListener('controllerchange',function(){
-    if(_swPendingReload)window.location.reload();
-  });
+  navigator.serviceWorker.getRegistrations().then(function(regs){
+    (regs||[]).forEach(function(r){ r.unregister(); });
+  }).catch(function(){});
 }
 // 把 topbar 实际高度同步到 --parts-top，令部位栏吸顶刚好贴住 topbar 下面
 window.syncPartsTop=function(){

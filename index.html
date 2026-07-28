@@ -13,7 +13,7 @@
 <script>
 if('serviceWorker' in navigator){
   window.addEventListener('load',function(){
-    navigator.serviceWorker.register('./sw.js?v=4').then(function(reg){
+    navigator.serviceWorker.register('./sw.js?v=5').then(function(reg){
       console.log('SW registered:',reg.scope);
     }).catch(function(e){console.log('SW failed:',e)});
   });
@@ -362,8 +362,6 @@ main{padding:14px 14px 20px;max-width:680px;margin:0 auto}
 .ex-progress input:focus{border-color:var(--primary)}
 .ex-progress .pr-save{padding:4px 10px;border-radius:7px;background:var(--primary);color:#fff;font-size:11px;font-weight:600;cursor:pointer;transition:.15s}
 .ex-progress .pr-save:active{transform:scale(.93)}
-.ex-expand{text-align:center;padding:10px;font-size:13px;color:var(--primary);cursor:pointer;font-weight:600;transition:.15s}
-.ex-expand:active{transform:scale(.97)}
 /* 旧的 train-info 热量统计恢复显示 */
 #calBar{margin:12px 2px 0}
 .cal-bar-inner{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
@@ -512,6 +510,46 @@ html.dark .sync-dot{background:rgba(255,255,255,.06)}
 .exercise-list.virtual{position:relative;min-height:60px}
 /* 周日历星期标签 */
 .week-cell.label{background:transparent;border-color:transparent;color:var(--muted);font-weight:700;font-size:11px}
+
+/* 动作卡步进按钮（+/-）*/
+.stepper{display:inline-flex;align-items:center;background:var(--card);border:1px solid var(--border);border-radius:8px;overflow:hidden}
+.stepper .step{width:24px;height:26px;display:flex;align-items:center;justify-content:center;font-size:15px;font-weight:700;color:var(--muted);background:var(--bg-2);border:none;cursor:pointer;line-height:1;user-select:none}
+.stepper .step:active{background:var(--border)}
+.stepper input{width:38px;border:none;border-radius:0;background:transparent;text-align:center;font-size:12px;padding:4px 2px;color:var(--text);outline:none}
+.ex-progress .stepper{margin-left:2px}
+
+/* 替换动作 → bottom sheet */
+.swap-overlay{align-items:flex-end;justify-content:center;padding:0;animation:fadeIn .15s ease}
+.swap-box{border-radius:20px 20px 0 0;max-width:560px;max-height:80vh;animation:slideUp .24s cubic-bezier(.2,.8,.2,1);box-shadow:0 -10px 40px rgba(0,0,0,.25);padding-bottom:calc(18px + env(safe-area-inset-bottom))}
+.swap-box.closing{animation:slideDown .18s ease forwards}
+.sheet-handle{width:38px;height:4px;border-radius:2px;background:var(--border);margin:8px auto 4px}
+@keyframes slideUp{from{transform:translateY(100%)}to{transform:translateY(0)}}
+@keyframes slideDown{to{transform:translateY(100%)}}
+@keyframes fadeIn{from{opacity:0}to{opacity:1}}
+
+/* 首页仪表盘 */
+.dash-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;width:100%;max-width:440px;margin-top:6px}
+.dash-card{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:14px;position:relative;overflow:hidden}
+.dash-card.pA{border-top:3px solid var(--pA)}
+.dash-card.pB{border-top:3px solid var(--pB)}
+.dash-card .dc-head{display:flex;align-items:center;gap:8px;margin-bottom:8px}
+.dash-card .dc-av{width:30px;height:30px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:16px;background:var(--bg-2)}
+.dash-card.pA .dc-av{background:rgba(79,124,255,.14)}
+.dash-card.pB .dc-av{background:rgba(236,72,153,.14)}
+.dash-card .dc-name{font-size:15px;font-weight:800}
+.dash-card .dc-row{display:flex;justify-content:space-between;align-items:center;font-size:12px;color:var(--muted);padding:4px 0}
+.dash-card .dc-v{color:var(--text);font-weight:700;font-size:13px}
+.dash-card .dc-bar{height:6px;border-radius:3px;background:var(--bg-2);overflow:hidden;margin:2px 0 8px}
+.dash-card .dc-fill{height:100%;border-radius:3px;background:linear-gradient(90deg,var(--primary),var(--accent))}
+.dash-card.pB .dc-fill{background:linear-gradient(90deg,var(--pink),var(--orange))}
+html.dark .dash-card{background:#171f30}
+
+/* 动作搜索框 */
+.ex-search{margin:8px 2px 6px}
+.ex-search input{width:100%;box-sizing:border-box;background:var(--card);border:1px solid var(--border);border-radius:12px;padding:11px 14px;font-size:14px;color:var(--text);outline:none}
+.ex-search input:focus{border-color:var(--primary)}
+.ex-search input::placeholder{color:var(--muted)}
+.ex-empty{text-align:center;color:var(--muted);padding:34px 12px;font-size:14px}
 </style>
 </head>
 <body>
@@ -542,6 +580,7 @@ html.dark .sync-dot{background:rgba(255,255,255,.06)}
       <div class="pgoal">背部练薄 · 手臂紧致<br>提臀直腿</div>
     </div>
   </div>
+  <div class="dash-grid" id="homeDash"></div>
   <div class="name-edit">
     <div class="row">
       <div><label>计划 A 昵称</label><input type="text" id="nameA" placeholder="自定义昵称" maxlength="8"></div>
@@ -615,6 +654,7 @@ html.dark .sync-dot{background:rgba(255,255,255,.06)}
       <div class="cal-detail" id="calDetail"></div>
     </div>
   </div>
+  <div class="ex-search"><input id="exSearch" type="search" inputmode="search" placeholder="🔍 搜动作 / 部位，如：卧推、胸"></div>
   <div id="exerciseList"></div>
   <button class="checkin-btn" id="checkinBtn">完成今日打卡</button>
 
@@ -1400,14 +1440,69 @@ function initSelectPage(){
   });
   document.getElementById('nameA').oninput=e=>{document.getElementById('nameA-display').textContent=e.target.value||'计划 A'};
   document.getElementById('nameB').oninput=e=>{document.getElementById('nameB-display').textContent=e.target.value||'计划 B'};
+  renderHomeDash();
+}
+
+function weekRange(){
+  const d=new Date();d.setHours(0,0,0,0);
+  const day=(d.getDay()+6)%7;
+  const mon=new Date(d);mon.setDate(d.getDate()-day);
+  const sun=new Date(mon);sun.setDate(mon.getDate()+7);
+  return [mon,sun];
+}
+function countWeekCheckins(p){
+  const [mon,sun]=weekRange();let c=0;
+  for(let t=mon.getTime();t<sun.getTime();t+=86400000){
+    const k=dateKeyOf(new Date(t));
+    if(state[p].checkins[k]&&state[p].checkins[k].partChecked)c++;
+  }
+  return c;
+}
+function streakDays(p){
+  let s=0;const d=new Date();d.setHours(0,0,0,0);
+  for(;;){
+    const k=dateKeyOf(d);
+    if(state[p].checkins[k]&&state[p].checkins[k].partChecked){s++;d.setDate(d.getDate()-1);}
+    else break;
+  }
+  return s;
+}
+function latestWeight(p){
+  const body=state[p].body||{};
+  const keys=Object.keys(body).filter(k=>body[k]&&body[k].weight);
+  if(!keys.length)return null;
+  keys.sort();
+  const tk=todayKey();let best=null;
+  keys.forEach(k=>{if(k<=tk)best=k;});
+  return best?body[best].weight:null;
+}
+function renderHomeDash(){
+  const el=document.getElementById('homeDash');if(!el)return;
+  el.innerHTML=['A','B'].map(p=>{
+    const name=state[p].name||('计划 '+p);
+    const emoji=p==='A'?'🏃':'🧘';
+    const wc=countWeekCheckins(p);
+    const st=streakDays(p);
+    const diet=state[p].diet[todayKey()];
+    const w=latestWeight(p);
+    const cls=p==='A'?'pA':'pB';
+    return '<div class="dash-card '+cls+'"><div class="dc-head"><span class="dc-av">'+emoji+'</span><span class="dc-name">'+name+'</span></div>'+
+      '<div class="dc-row"><span>📅 本周打卡</span><span class="dc-v">'+wc+'/7 天</span></div>'+
+      '<div class="dc-bar"><div class="dc-fill" style="width:'+Math.min(100,Math.round(wc/7*100))+'%"></div></div>'+
+      '<div class="dc-row"><span>🔥 连续打卡</span><span class="dc-v">'+st+' 天</span></div>'+
+      '<div class="dc-row"><span>🍽 今日饮食</span><span class="dc-v">'+(diet?(diet==='low'?'🥬 低碳':'🍚 高碳'):'未记录')+'</span></div>'+
+      '<div class="dc-row"><span>⚖️ 最新体重</span><span class="dc-v">'+(w?w+' kg':'—')+'</span></div></div>';
+  }).join('');
 }
 
 function enterApp(){
   document.getElementById('selectPage').style.display='none';
   document.getElementById('mainApp').style.display='block';
   _inApp=true;
-  // 重置当前部位
+  // 重置当前部位与搜索
   curPart = partsList()[0].key;
+  window._exSearch='';
+  const sx=document.getElementById('exSearch'); if(sx)sx.value='';
   applyProfileTheme();
   renderAll();
   // 进入后拉取对方最新数据
@@ -1470,6 +1565,7 @@ function renderTopbar(){
   document.getElementById('appTitle').textContent=`${getPName()} · 健身工作台`;
 }
 
+function clearExSearch(){window._exSearch='';const s=document.getElementById('exSearch');if(s)s.value='';}
 function renderParts(){
   const bar=document.getElementById('partsBar');
   bar.innerHTML='';
@@ -1479,7 +1575,7 @@ function renderParts(){
     div.className='part'+(p.key===curPart?' active':'')+(done?' done':'');
     div.classList.add(curProfile==='A'?'pA':'pB');
     div.innerHTML=`<span class="emoji">${p.emoji}</span><span>${p.name}</span>`;
-    div.onclick=()=>{curPart=p.key;renderParts();renderExercises()};
+    div.onclick=()=>{curPart=p.key;clearExSearch();renderParts();renderExercises()};
     bar.appendChild(div);
   });
 }
@@ -1500,7 +1596,9 @@ function buildExerciseCard(ex,i){
     '<span class="ex-swap" data-i="'+i+'">🔄 替换</span></div>'+
     '<div class="ex-tip"><b>要领：</b>'+ex.t+'</div>'+
     '<div class="ex-progress"><span class="pr-label">上次</span><span class="pr-val">'+lastW+' · '+lastR+'</span>'+
-    '<input class="pr-w" type="number" placeholder="kg" min="0" step="0.5" value="'+(prog.weight||'')+'"><input class="pr-r" type="number" placeholder="次" min="0" value="'+(prog.reps||'')+'"><button class="pr-save" data-en="'+ex.n+'">记录</button>'+
+    '<span class="stepper"><button type="button" class="step minus" data-f="w">−</button><input class="pr-w" type="number" placeholder="kg" min="0" step="0.5" value="'+(prog.weight||'')+'"><button type="button" class="step plus" data-f="w">+</button></span>'+
+    '<span class="stepper"><button type="button" class="step minus" data-f="r">−</button><input class="pr-r" type="number" placeholder="次" min="0" value="'+(prog.reps||'')+'"><button type="button" class="step plus" data-f="r">+</button></span>'+
+    '<button class="pr-save" data-en="'+ex.n+'">记录</button>'+
     '<span class="pr-chart" data-en="'+ex.n+'">📈 进步</span></div>';
   // 勾选（打卡前可先填重量，勾选时自动记录到进步历史）
   div.querySelector('.check').onclick=()=>{
@@ -1526,6 +1624,20 @@ function buildExerciseCard(ex,i){
     profile().exProgress[ex.n]=p; saveLocal();
   };
   wInput.addEventListener('input',saveDraft); rInput.addEventListener('input',saveDraft);
+  // +/- 步进按钮：快捷增减重量/次数并保存草稿
+  div.querySelectorAll('.stepper .step').forEach(btn=>{
+    btn.onclick=()=>{
+      const f=btn.dataset.f;
+      const inp=f==='w'?wInput:rInput;
+      const step=f==='w'?1.25:1;
+      let v=parseFloat(inp.value);
+      if(isNaN(v))v=0;
+      v+=(btn.classList.contains('plus')?1:-1)*step;
+      if(v<0)v=0;
+      inp.value=(f==='w'?Math.round(v*100)/100:Math.round(v));
+      saveDraft();
+    };
+  });
   // 记录按钮 → 写入进步历史
   div.querySelector('.pr-save').onclick=function(){
     const w=parseFloat(this.parentElement.querySelector('.pr-w').value);
@@ -1578,7 +1690,16 @@ function renderExercises(){
   // 应用替换配置
   const swaps=profile().exSwaps||{};
   const exs=allExs.map((ex,i)=>{const s=swaps[curPart+'_'+i];return s?swaps[curPart+'_'+i]:ex;});
-  // 计算热量
+  // 搜索过滤（保留原始索引，确保打卡/替换正确）
+  let view=exs.map((_,i)=>i);
+  if(window._exSearch){
+    const q=window._exSearch;
+    const curName=(partsList().find(p=>p.key===curPart).name).toLowerCase();
+    if(!curName.includes(q)){
+      view=exs.map((ex,i)=>({ex,i})).filter(o=>o.ex.n.toLowerCase().includes(q)).map(o=>o.i);
+    }
+  }
+  // 计算热量（按完整部位）
   let totalCal=0,doneCal=0;
   exs.forEach((ex,i)=>{
     const setsNum=parseInt((ex.s||'').match(/(\d+)/)?.[1]||3);
@@ -1586,13 +1707,18 @@ function renderExercises(){
     if(profile().checkins[todayKey()]?.exercises?.[curPart]?.[i])doneCal+=exCal;
   });
   updateExCalBar(totalCal,doneCal,exs.length);
-  // 长列表启用虚拟滚动，否则普通渲染
-  if(exs.length>EX_VT){
-    renderExVirtual(list,exs);
+  // 渲染：长列表虚拟滚动，否则普通渲染；搜索无结果时提示
+  if(view.length===0){
+    exitVirtual(list);
+    list.innerHTML='<div class="ex-empty">😶 没有匹配「'+window._exSearch+'」的动作</div>';
+    return;
+  }
+  if(view.length>EX_VT){
+    renderExVirtual(list,exs,view);
   } else {
     exitVirtual(list);
     list.innerHTML='';
-    exs.forEach((ex,i)=>list.appendChild(buildExerciseCard(ex,i)));
+    view.forEach(i=>list.appendChild(buildExerciseCard(exs[i],i)));
   }
 }
 function exitVirtual(list){
@@ -1601,7 +1727,7 @@ function exitVirtual(list){
   if(window._vTargets)window._vTargets.delete(list);
   list._vExs=null;list._vHeights=null;list._vSig=null;list._vUpdate=null;
 }
-function renderExVirtual(list,exs){
+function renderExVirtual(list,exs,view){
   list.classList.add('virtual');
   if(!window._vTargets)window._vTargets=new Set();
   window._vTargets.add(list);
@@ -1612,9 +1738,10 @@ function renderExVirtual(list,exs){
     window.addEventListener('resize',onScroll,{passive:true});
   }
   const EST=150;
-  const sig=curPart+'#'+exs.length+'#'+JSON.stringify(profile().exSwaps||{});
-  let h=list._vSig===sig && list._vHeights ? list._vHeights : exs.map(()=>EST);
-  list._vHeights=h; list._vExs=exs; list._vSig=sig;
+  const q=window._exSearch||'';
+  const sig=curPart+'#'+view.length+'#'+q+'#'+JSON.stringify(profile().exSwaps||{});
+  let h=list._vSig===sig && list._vHeights ? list._vHeights : view.map(()=>EST);
+  list._vHeights=h; list._vExs=exs; list._vView=view; list._vSig=sig;
   const sumArr=(a,s,e)=>{let t=0;for(let i=s;i<e;i++)t+=a[i];return t;};
   list.style.position='relative';
   list.style.height=sumArr(h,0,h.length)+'px';
@@ -1631,7 +1758,7 @@ function renderExVirtual(list,exs){
     for(let i=start;i<h.length;i++){ if(acc2>hi){end=i;break;} acc2+=h[i]; }
     list.innerHTML='';
     for(let i=start;i<end;i++){
-      const card=buildExerciseCard(exs[i],i);
+      const card=buildExerciseCard(exs[view[i]],view[i]);
       card.style.position='absolute';
       card.style.left='0';card.style.right='0';
       card.style.top=sumArr(h,0,i)+'px';
@@ -1655,29 +1782,34 @@ function renderExVirtual(list,exs){
 
 /* 替换动作弹窗 */
 var _swapPicker=null;
+function closeSwapPicker(ov){
+  if(!ov)return;
+  ov.classList.add('closing');
+  setTimeout(function(){ if(ov&&ov.parentNode)ov.remove(); },180);
+  _swapPicker=null;
+}
 function showSwapPicker(idx,curName){
   if(_swapPicker)return;
   var allExs=(exData()[curPart]||[]);
   var overlay=document.createElement('div');
   overlay.className='swap-overlay';
-  overlay.onclick=function(){this.remove();_swapPicker=null;};
+  overlay.onclick=function(e){ if(e.target===overlay)closeSwapPicker(overlay); };
   var box=document.createElement('div');
   box.className='swap-box';
   box.onclick=function(e){e.stopPropagation()};
-  box.innerHTML='<div class="swap-head">选择替换动作 <span class="swap-close">✕</span></div><div class="swap-list"></div>';
-  box.querySelector('.swap-close').onclick=function(){overlay.remove();_swapPicker=null;};
+  box.innerHTML='<div class="sheet-handle"></div><div class="swap-head">选择替换动作 <span class="swap-close">✕</span></div><div class="swap-list"></div>';
+  box.querySelector('.swap-close').onclick=function(){closeSwapPicker(overlay);};
+  box.querySelector('.sheet-handle').onclick=function(){closeSwapPicker(overlay);};
   var list=box.querySelector('.swap-list');
   allExs.forEach(function(ex,i){
     var d=document.createElement('div');
     d.className='swap-item'+(ex.n===curName?' active':'');
     d.innerHTML='<span class="sn">'+(ex.n===curName?'✓ ':'')+ex.n+'</span><span class="ss">'+ex.s+'</span><span class="sb">'+(ex.b||'')+'</span>';
     d.onclick=function(){
-      if(overlay&&_swapPicker){
-        if(!profile().exSwaps)profile().exSwaps={};
-        if(ex.n===curName)delete profile().exSwaps[curPart+'_'+idx];
-        else profile().exSwaps[curPart+'_'+idx]=ex;
-        save();overlay.remove();_swapPicker=null;renderExercises();
-      }
+      if(!profile().exSwaps)profile().exSwaps={};
+      if(ex.n===curName)delete profile().exSwaps[curPart+'_'+idx];
+      else profile().exSwaps[curPart+'_'+idx]=ex;
+      save();closeSwapPicker(overlay);renderExercises();
     };
     list.appendChild(d);
   });
@@ -2541,6 +2673,23 @@ document.getElementById('expAddBtn').onclick=()=>{
 
 // 主题切换
 document.getElementById('themeBtn').onclick=toggleTheme;
+// 动作搜索框
+function clearExSearch(){window._exSearch='';const s=document.getElementById('exSearch');if(s)s.value='';}
+(function(){
+  const s=document.getElementById('exSearch');if(!s)return;
+  s.value=window._exSearch||'';
+  s.addEventListener('input',()=>{
+    const q=s.value.trim().toLowerCase();
+    window._exSearch=q;
+    // 若匹配某个部位名，自动切换部位（并显示该部位全部）
+    const part=partsList().find(p=>p.name.toLowerCase().includes(q)||p.key.toLowerCase().includes(q));
+    if(part&&part.key!==curPart){curPart=part.key;renderParts();}
+    renderExercises();
+  });
+  s.addEventListener('search',()=>{ // 点清除按钮（type=search）
+    if(!s.value){window._exSearch='';renderExercises();}
+  });
+})();
 // 饮水
 document.getElementById('waterAdd').onclick=drinkWater;
 document.getElementById('waterReset').onclick=resetWater;

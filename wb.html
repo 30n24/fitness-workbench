@@ -94,6 +94,13 @@ input,textarea{font-family:inherit}
 .diet-tag{padding:3px 9px;border-radius:20px;font-size:11px;font-weight:600}
 .diet-tag.low{background:rgba(52,211,153,.15);color:#34d399;border:1px solid rgba(52,211,153,.3)}
 .diet-tag.high{background:rgba(251,146,60,.15);color:#fb923c;border:1px solid rgba(251,146,60,.3)}
+/* 记录日期选择条（补记录用） */
+.recdate-bar{display:flex;align-items:center;gap:8px;padding:8px 16px;background:var(--bg);border-bottom:1px solid var(--border)}
+.recdate-bar .rd-nav{width:34px;height:34px;border-radius:10px;background:var(--card);border:1px solid var(--border);font-size:18px;line-height:1;color:var(--text);flex-shrink:0}
+.recdate-bar .rd-main{flex:1;display:flex;align-items:center;justify-content:center;gap:6px;height:34px;border-radius:10px;background:var(--card);border:1px solid var(--border);color:var(--text);font-size:14px;font-weight:600}
+.recdate-bar .rd-main .rd-ico{font-size:14px}
+.recdate-bar .rd-today{height:34px;padding:0 12px;border-radius:10px;background:rgba(79,124,255,.12);border:1px solid rgba(79,124,255,.3);color:var(--primary);font-size:13px;font-weight:600;flex-shrink:0}
+.recdate-bar .rd-input{position:absolute;opacity:0;width:1px;height:1px;pointer-events:none}
 .switch-user{width:34px;height:34px;border-radius:10px;background:var(--card);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0}
 .sync-dot{font-size:10px;padding:3px 8px;border-radius:20px;font-weight:600;white-space:nowrap;flex-shrink:0;border:1px solid var(--border);background:var(--card);color:var(--muted);cursor:pointer;transition:.18s}
 .sync-dot:active{transform:scale(.92)}
@@ -622,6 +629,18 @@ html.dark .dash-card{background:#171f30}
     <button class="switch-user" id="switchUser" title="切换计划">🔄</button>
     <button class="switch-user" id="homeBtn" title="返回选人">🏠</button>
   </div>
+</div>
+
+<!-- 记录日期选择条（补记录用：可切到过往日期） -->
+<div class="recdate-bar" id="recDateBar">
+  <button class="rd-nav" id="rdPrev" aria-label="前一天">‹</button>
+  <button class="rd-main" id="rdMain" title="点按选择日期">
+    <span class="rd-ico">📅</span>
+    <span class="rd-label" id="rdLabel">今日</span>
+  </button>
+  <button class="rd-nav" id="rdNext" aria-label="后一天">›</button>
+  <button class="rd-today" id="rdToday" style="display:none">回到今日</button>
+  <input type="date" id="rdInput" class="rd-input">
 </div>
 
 <!-- 训练页 -->
@@ -1330,8 +1349,25 @@ let partsExpanded=false; // 部位栏折叠状态：默认只显示5个主要训
 let curDiet='low';
 let curPage='train';
 let curExpDate=new Date();
+let curRecDate=new Date();   // 当前“记录日期”：默认今日，可切到过往日期补记录
 
 function todayKey(){const d=new Date();return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`}
+// 记录日期 key（与 todayKey 同格式）
+function recKey(){const d=curRecDate;return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`}
+function isRecToday(){return recKey()===todayKey();}
+function recDayLabel(){const wk=['日','一','二','三','四','五','六'];const d=curRecDate;return isRecToday()?'今日':(d.getMonth()+1)+'月'+d.getDate()+'日 周'+wk[d.getDay()];}
+// 切换记录日期后刷新相关视图（训练/饮食/有氧/饮水/羽毛球）
+function applyRecDate(){updateRecDateBar();renderTopbar();renderParts();renderExercises();renderBadminton();renderCardio();renderCalorieSummary();renderWater();if(curPage==='diet')renderDiet();}
+function shiftRecDate(n){curRecDate.setDate(curRecDate.getDate()+n);applyRecDate();}
+function resetRecDate(){curRecDate=new Date();applyRecDate();}
+function setRecDate(y,m,d){curRecDate=new Date(y,m-1,d);applyRecDate();}
+function updateRecDateBar(){
+  const wk=['日','一','二','三','四','五','六'];const d=curRecDate;
+  const lbl=document.getElementById('rdLabel'); if(lbl)lbl.textContent=recDayLabel();
+  const tb=document.getElementById('rdToday'); if(tb)tb.style.display=isRecToday()?'none':'';
+  const inp=document.getElementById('rdInput'); if(inp)inp.value=recKey();
+  const chip=document.getElementById('dateChip'); if(chip)chip.textContent=(d.getMonth()+1)+'月'+d.getDate()+'日 周'+wk[d.getDay()];
+}
 function monthKey(){const d=new Date();return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`}
 function load(){try{const s=JSON.parse(localStorage.getItem(KEY)||'{}');if(!s.A)s.A={checkins:{},notes:{},diet:{},badminton:{},cardio:{},breakfast:{},lunch:{},dinner:{},eatOut:{},expenses:{},foods:[],body:{},water:{},name:''};if(!s.B)s.B={checkins:{},notes:{},diet:{},badminton:{},cardio:{},breakfast:{},lunch:{},dinner:{},eatOut:{},expenses:{},foods:[],body:{},water:{},name:''};['A','B'].forEach(p=>{['breakfast','lunch','dinner','eatOut','expenses'].forEach(k=>{if(!s[p][k])s[p][k]={}});if(!s[p].cardio)s[p].cardio={}});if(!s._sync)s._sync={A:0,B:0};return s}catch(e){return{A:{checkins:{},notes:{},diet:{},badminton:{},cardio:{},breakfast:{},lunch:{},dinner:{},eatOut:{},expenses:{},foods:[],body:{},water:{},name:''},B:{checkins:{},notes:{},diet:{},badminton:{},cardio:{},breakfast:{},lunch:{},dinner:{},eatOut:{},expenses:{},foods:[],body:{},water:{},name:''},_sync:{A:0,B:0}}}}
 function saveLocal(){localStorage.setItem(KEY,JSON.stringify(state))}
@@ -1528,6 +1564,7 @@ function enterApp(){
   applyProfileTheme();
   migrateDinner();
   renderAll();
+  updateRecDateBar();
   if(window.syncPartsTop)window.syncPartsTop();
   // 进入后拉取对方最新数据
   if(cloudReady()){
@@ -1572,9 +1609,9 @@ function backToSelect(){
 
 /* ===== 渲染 ===== */
 function renderTopbar(){
-  const d=new Date();const wk=['日','一','二','三','四','五','六'];
+  const d=curRecDate;const wk=['日','一','二','三','四','五','六'];
   document.getElementById('dateChip').textContent=`${d.getMonth()+1}月${d.getDate()}日 周${wk[d.getDay()]}`;
-  const diet=profile().diet[todayKey()]||'';
+  const diet=profile().diet[recKey()]||'';
   const tag=document.getElementById('dietTag');
   if(diet){
     tag.textContent=diet==='low'?'低碳日':'高碳日';
@@ -1591,7 +1628,7 @@ function renderTopbar(){
 }
 
 function makePartChip(p){
-  const done=profile().checkins[todayKey()]?.partChecked;
+  const done=profile().checkins[recKey()]?.partChecked;
   const div=document.createElement('div');
   div.className='part'+(p.key===curPart?' active':'')+(done?' done':'');
   div.classList.add(curProfile==='A'?'pA':'pB');
@@ -1620,7 +1657,7 @@ function renderParts(){
 
 /* 构建单个动作卡片（普通渲染与虚拟滚动共用）*/
 function buildExerciseCard(ex,i){
-  const done=profile().checkins[todayKey()]?.exercises?.[curPart]?.[i]||false;
+  const done=profile().checkins[recKey()]?.exercises?.[curPart]?.[i]||false;
   const setsNum=parseInt((ex.s||'').match(/(\d+)/)?.[1]||3);
   const exCal=(ex.cal||0)*setsNum;
   const prog=profile().exProgress?.[ex.n]||{};
@@ -1642,12 +1679,12 @@ function buildExerciseCard(ex,i){
   div.querySelector('.check').onclick=()=>{
     const w=parseFloat(div.querySelector('.pr-w').value),r=parseInt(div.querySelector('.pr-r').value);
     if(w&&r)recordExProgress(ex.n,w,r);
-    const t=profile().checkins[todayKey()]||{part:null,exercises:{}};
+    const t=profile().checkins[recKey()]||{part:null,exercises:{}};
     if(!t.exercises[curPart])t.exercises[curPart]={};
     if(t.exercises[curPart][i])delete t.exercises[curPart][i];
     else t.exercises[curPart][i]=true;
     t.part=curPart;
-    profile().checkins[todayKey()]=t;
+    profile().checkins[recKey()]=t;
     save();renderExercises();
   };
   // 替换按钮
@@ -1658,7 +1695,7 @@ function buildExerciseCard(ex,i){
     const w=parseFloat(wInput.value),r=parseInt(rInput.value);
     if(!profile().exProgress)profile().exProgress={};
     const p=profile().exProgress[ex.n]||{};
-    if(w)p.weight=w; if(r)p.reps=r; if(w||r)p.date=todayKey();
+    if(w)p.weight=w; if(r)p.reps=r; if(w||r)p.date=recKey();
     profile().exProgress[ex.n]=p; saveLocal();
   };
   wInput.addEventListener('input',saveDraft); rInput.addEventListener('input',saveDraft);
@@ -1774,7 +1811,7 @@ function renderExercises(){
   showIndices.forEach(i=>{
     const setsNum=parseInt((exs[i].s||'').match(/(\d+)/)?.[1]||3);
     const exCal=(exs[i].cal||0)*setsNum; totalCal+=exCal;
-    if(profile().checkins[todayKey()]?.exercises?.[curPart]?.[i])doneCal+=exCal;
+    if(profile().checkins[recKey()]?.exercises?.[curPart]?.[i])doneCal+=exCal;
   });
   updateExCalBar(totalCal,doneCal,exs.length);
   renderExerciseCards(list, exs, mainIdx, suppIdx, showSupp, isSearching);
@@ -2377,7 +2414,7 @@ function showFoodHint(msg){
   clearTimeout(_hintTimer);_hintTimer=setTimeout(()=>{el.style.opacity='0'},2800);
 }
 function renderDiet(){
-  const k=todayKey();
+  const k=recKey();
   const diet=profile().diet[k]||'';
   const goalEl=document.getElementById('dietGoal');
   if(diet==='low')goalEl.innerHTML='🔥 <b>低碳日</b>：控制碳水，提高蛋白与优质脂肪，配合今日训练。';
@@ -2393,7 +2430,7 @@ function renderDiet(){
   if(fl){const names=FOOD_DB.map(f=>f.n).concat((profile().foods||[]).map(f=>f.n));fl.innerHTML=names.map(n=>`<option value="${n}">`).join('');}
 }
 function renderMeal(kind,itemsId,totalId){
-  const k=todayKey();
+  const k=recKey();
   const items=profile()[kind]?.[k]||[];
   const el=document.getElementById(itemsId);el.innerHTML='';
   let total=0;
@@ -2424,7 +2461,7 @@ function migrateDinner(){
   });
 }
 function renderDietSummary(){
-  const k=todayKey();
+  const k=recKey();
   const bf=(profile().breakfast?.[k]||[]).reduce((s,it)=>s+it.cal,0);
   const ln=(profile().lunch?.[k]||[]).reduce((s,it)=>s+it.cal,0);
   const dn=(profile().dinner?.[k]||[]).reduce((s,it)=>s+((typeof it==='object'?it.cal:(DINNER_MENU[it]?.cal||0))||0),0);
@@ -2445,7 +2482,7 @@ function renderDietSummary(){
   renderCalorieSummary();
 }
 function renderCalorieSummary(){
-  const k=todayKey();
+  const k=recKey();
   const bf=(profile().breakfast?.[k]||[]).reduce((s,it)=>s+it.cal,0);
   const ln=(profile().lunch?.[k]||[]).reduce((s,it)=>s+it.cal,0);
   const dn=(profile().dinner?.[k]||[]).reduce((s,it)=>s+((typeof it==='object'?it.cal:(DINNER_MENU[it]?.cal||0))||0),0);
@@ -2461,11 +2498,11 @@ function renderCalorieSummary(){
   }
 }
 function renderBadminton(){
-  const k=todayKey();
+  const k=recKey();
   const rec=profile().badminton?.[k];
   const inp=document.getElementById('bdDuration'),status=document.getElementById('bdStatus'),saveBtn=document.getElementById('bdSave'),delBtn=document.getElementById('bdDel');
-  if(rec){inp.value=rec.duration||'';status.textContent='今日已打卡：'+rec.duration+' 分钟 · 约'+(rec.duration*7)+'kcal';status.className='today-status done';saveBtn.textContent='更新';delBtn.style.display='';}
-  else{status.textContent='今日未打卡';status.className='today-status';saveBtn.textContent='打卡';delBtn.style.display='none';}
+  if(rec){inp.value=rec.duration||'';status.textContent=recDayLabel()+'已打卡：'+rec.duration+' 分钟 · 约'+(rec.duration*7)+'kcal';status.className='today-status done';saveBtn.textContent='更新';delBtn.style.display='';}
+  else{status.textContent=recDayLabel()+'未打卡';status.className='today-status';saveBtn.textContent='打卡';delBtn.style.display='none';}
   saveBtn.onclick=()=>{const d=parseInt(inp.value);if(!d||d<=0)return;profile().badminton[k]={duration:d};save();renderBadminton();renderCalorieSummary();if(curPage==='stats')renderStats();};
   delBtn.onclick=()=>{delete profile().badminton[k];save();renderBadminton();renderCalorieSummary();if(curPage==='stats')renderStats();};
 }
@@ -2501,7 +2538,7 @@ function calcCardioCal(type,dur,dist,inc,weight){
 }
 function cardioCalOf(c){ return c.cal!=null?c.cal:Math.round((c.duration||0)*((CARDIO[c.type]&&CARDIO[c.type].cpm)||8)); }
 function renderCardio(){
-  const k=todayKey();
+  const k=recKey();
   const list=profile().cardio?.[k]||[];
   const el=document.getElementById('cardioList');el.innerHTML='';
   list.forEach((c,i)=>{
@@ -2533,15 +2570,15 @@ function toggleTheme(){
 /* 饮水 */
 const WATER_GOAL=8;
 function renderWater(){
-  const k=todayKey();
+  const k=recKey();
   const n=profile().water?.[k]||0;
   const fill=document.getElementById('waterFill');
   const count=document.getElementById('waterCount');
   if(fill)fill.style.width=Math.min(100,Math.round(n/WATER_GOAL*100))+'%';
   if(count&&count.firstChild)count.firstChild.nodeValue=n+' / '+WATER_GOAL+' 杯 ';
 }
-function drinkWater(){const k=todayKey();if(!profile().water)profile().water={};profile().water[k]=(profile().water[k]||0)+1;save();renderWater();}
-function resetWater(){const k=todayKey();if(!profile().water)profile().water={};profile().water[k]=0;save();renderWater();}
+function drinkWater(){const k=recKey();if(!profile().water)profile().water={};profile().water[k]=(profile().water[k]||0)+1;save();renderWater();}
+function resetWater(){const k=recKey();if(!profile().water)profile().water={};profile().water[k]=0;save();renderWater();}
 
 /* 自定义食物 */
 function renderCustomFood(){
@@ -2629,9 +2666,9 @@ function drawBodyChart(){
 function recordExProgress(en,w,r){
   if(!profile().exProgress)profile().exProgress={};
   const p=profile().exProgress[en]||{};
-  p.weight=w;p.reps=r;p.date=todayKey();
+  p.weight=w;p.reps=r;p.date=recKey();
   if(!p.history)p.history=[];
-  const dk=todayKey();
+  const dk=recKey();
   const idx=p.history.findIndex(h=>h.date===dk);
   const rec={date:dk,weight:w,reps:r};
   if(idx>=0)p.history[idx]=rec;else p.history.push(rec);
@@ -2687,22 +2724,28 @@ function generateReport(){
 document.getElementById('chkLow').addEventListener('change',e=>{
   if(e.target.checked){
     document.getElementById('chkHigh').checked=false;
-    profile().diet[todayKey()]='low';
+    profile().diet[recKey()]='low';
   } else {
-    delete profile().diet[todayKey()];
+    delete profile().diet[recKey()];
   }
   save();renderDiet();renderTopbar();
 });
 document.getElementById('chkHigh').addEventListener('change',e=>{
   if(e.target.checked){
     document.getElementById('chkLow').checked=false;
-    profile().diet[todayKey()]='high';
+    profile().diet[recKey()]='high';
   } else {
-    delete profile().diet[todayKey()];
+    delete profile().diet[recKey()];
   }
   save();renderDiet();renderTopbar();
 });
 document.querySelectorAll('.tabbar button').forEach(b=>{b.onclick=()=>switchPage(b.dataset.page)});
+// 记录日期选择条（补记录用：可切到过往日期）
+document.getElementById('rdPrev').onclick=()=>shiftRecDate(-1);
+document.getElementById('rdNext').onclick=()=>shiftRecDate(1);
+document.getElementById('rdToday').onclick=()=>resetRecDate();
+document.getElementById('rdMain').onclick=()=>{const i=document.getElementById('rdInput');if(i)i.click();};
+document.getElementById('rdInput').onchange=function(){if(!this.value)return;const p=this.value.split('-');setRecDate(+p[0],+p[1],+p[2]);};
 document.getElementById('switchUser').onclick=switchProfile;
 document.getElementById('homeBtn').onclick=backToSelect;
 // 数据导出
@@ -2774,8 +2817,8 @@ document.getElementById('cardioSave').onclick=()=>{
   if(dur<=0 && dist<=0)return;
   const weight=latestWeight(curProfile)||60;
   const cal=calcCardioCal(type,dur,dist,inc,weight);
-  if(!profile().cardio[todayKey()])profile().cardio[todayKey()]=[];
-  profile().cardio[todayKey()].push({type,duration:dur,dist,inc,cal});
+  if(!profile().cardio[recKey()])profile().cardio[recKey()]=[];
+  profile().cardio[recKey()].push({type,duration:dur,dist,inc,cal});
   save();
   document.getElementById('cardioDuration').value='';
   document.getElementById('cardioDist').value='';
@@ -2792,8 +2835,8 @@ document.getElementById('breakfastAdd').onclick=()=>{
   if(!name)return;
   const info=matchFoodCal(name);
   if(!profile().breakfast)profile().breakfast={};
-  if(!profile().breakfast[todayKey()])profile().breakfast[todayKey()]=[];
-  profile().breakfast[todayKey()].push({name,cal:info.cal,carb:info.carb,matched:info.matched||''});
+  if(!profile().breakfast[recKey()])profile().breakfast[recKey()]=[];
+  profile().breakfast[recKey()].push({name,cal:info.cal,carb:info.carb,matched:info.matched||''});
   save();
   document.getElementById('breakfastInput').value='';
   renderBreakfast();renderDietSummary();
@@ -2806,8 +2849,8 @@ document.getElementById('lunchAdd').onclick=()=>{
   if(!name)return;
   const info=matchFoodCal(name);
   if(!profile().lunch)profile().lunch={};
-  if(!profile().lunch[todayKey()])profile().lunch[todayKey()]=[];
-  profile().lunch[todayKey()].push({name,cal:info.cal,carb:info.carb,matched:info.matched||''});
+  if(!profile().lunch[recKey()])profile().lunch[recKey()]=[];
+  profile().lunch[recKey()].push({name,cal:info.cal,carb:info.carb,matched:info.matched||''});
   save();
   document.getElementById('lunchInput').value='';
   renderLunch();renderDietSummary();
@@ -2819,8 +2862,8 @@ document.getElementById('dinnerAdd').onclick=()=>{
   if(!name)return;
   const info=matchFoodCal(name);
   if(!profile().dinner)profile().dinner={};
-  if(!profile().dinner[todayKey()])profile().dinner[todayKey()]=[];
-  profile().dinner[todayKey()].push({name,cal:info.cal,carb:info.carb,matched:info.matched||''});
+  if(!profile().dinner[recKey()])profile().dinner[recKey()]=[];
+  profile().dinner[recKey()].push({name,cal:info.cal,carb:info.carb,matched:info.matched||''});
   save();
   document.getElementById('dinnerInput').value='';
   renderDinner();renderDietSummary();
@@ -2829,7 +2872,7 @@ document.getElementById('dinnerAdd').onclick=()=>{
 let noteTimer;
 document.getElementById('dietNote').addEventListener('input',e=>{
   clearTimeout(noteTimer);
-  noteTimer=setTimeout(()=>{profile().notes[todayKey()]=e.target.value;save()},300);
+  noteTimer=setTimeout(()=>{profile().notes[recKey()]=e.target.value;save()},300);
 });
 
 /* 记账事件 */

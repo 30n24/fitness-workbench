@@ -14,7 +14,7 @@
 if('serviceWorker' in navigator){
   let _swPendingReload=false;
   window.addEventListener('load',function(){
-    navigator.serviceWorker.register('./sw.js?v=12').then(function(reg){
+    navigator.serviceWorker.register('./sw.js?v=13').then(function(reg){
       // 已有等待中的新版本，立即激活
       if(reg.waiting){_swPendingReload=true;reg.waiting.postMessage({type:'SKIP_WAITING'});}
       reg.onupdatefound=function(){
@@ -34,17 +34,13 @@ if('serviceWorker' in navigator){
   });
 }
 // 把 topbar 实际高度同步到 --parts-top，令部位栏吸顶刚好贴住 topbar 下面
-(function(){
-  function sync(){
-    var tb=document.querySelector('.topbar');
-    if(tb)document.documentElement.style.setProperty('--parts-top',tb.offsetHeight+'px');
-  }
-  sync();
-  window.addEventListener('resize',sync);
-  document.addEventListener('DOMContentLoaded',sync);
-  setTimeout(sync,300);
-  setTimeout(sync,1000);
-})();
+window.syncPartsTop=function(){
+  var tb=document.querySelector('.topbar');
+  if(tb&&tb.offsetHeight>0)document.documentElement.style.setProperty('--parts-top',tb.offsetHeight+'px');
+};
+window.syncPartsTop();
+window.addEventListener('resize',window.syncPartsTop);
+document.addEventListener('DOMContentLoaded',window.syncPartsTop);
 </script>
 <style>
 /* 首屏 Loading - 内联最优先，避免白屏 */
@@ -1542,6 +1538,7 @@ function enterApp(){
   applyProfileTheme();
   migrateDinner();
   renderAll();
+  if(window.syncPartsTop)window.syncPartsTop();
   // 进入后拉取对方最新数据
   if(cloudReady()){
     setSyncStatus('syncing');

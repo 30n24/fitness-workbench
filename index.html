@@ -1872,7 +1872,9 @@ function renderExercises(){
   }
   // 显示5个主要 + 补充(折叠)
   const mainIdx = showIndices.slice(0, Math.min(EX_MAIN_COUNT, showIndices.length));
-  const suppIdx = showIndices.slice(mainIdx.length);
+  // 补充列表跳过同主5同名嘅动作（避免 beginner→intermediate 同名重复显示）
+  const mainNames = new Set(mainIdx.map(i=>exs[i].n));
+  const suppIdx = showIndices.slice(mainIdx.length).filter(i => !mainNames.has(exs[i].n));
   const showSupp = window._exSuppOpen === curPart && suppIdx.length > 0 && !isSearching;
 
   // 热量：按全部（已考虑顺序）

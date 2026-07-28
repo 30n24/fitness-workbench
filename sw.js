@@ -1,6 +1,7 @@
-// 健身计划工作台 Service Worker - 离线缓存 v9
-// 策略：缓存优先 + 后台更新 + 错误回退（确保离线/隧道失效时都能用）
-const CACHE_NAME = 'fitness-workbench-v9';
+// 健身计划工作台 Service Worker - 离线缓存 v10
+// 策略：HTML 文档「网络优先」（保证每次都系最新版）+ 其余静态资源「缓存优先 + 后台更新」
+//       离线/隧道失效时自动回退缓存，确保仍可用
+const CACHE_NAME = 'fitness-workbench-v10';
 const CACHE_URLS = [
   './',
   './index.html',
@@ -32,12 +33,33 @@ self.addEventListener('activate', function(event) {
   self.clients.claim();
 });
 
+function isHtml(req){
+  if (req.mode === 'navigate') return true;
+  var u = new URL(req.url);
+  return u.pathname === '/' || u.pathname.endsWith('/') || u.pathname.endsWith('index.html');
+}
+
 self.addEventListener('fetch', function(event) {
   if (event.request.method !== 'GET') return;
-
   var url = new URL(event.request.url);
   if (url.origin !== self.location.origin) return;
 
+  // HTML 文档：网络优先，离线回退缓存（保证每次都系最新版，唔会被旧缓存卡住）
+  if (isHtml(event.request)) {
+    event.respondWith(
+      fetch(event.request).then(function(resp) {
+        if (resp && resp.status === 200) {
+          caches.open(CACHE_NAME).then(function(cache) { cache.put(event.request, resp.clone()); });
+        }
+        return resp;
+      }).catch(function() {
+        return caches.match(event.request).then(function(c) { return c || caches.match('./index.html'); });
+      })
+    );
+    return;
+  }
+
+  // 其余静态资源：缓存优先 + 后台更新
   event.respondWith(
     caches.match(event.request).then(function(cached) {
       if (cached) {
@@ -51,7 +73,6 @@ self.addEventListener('fetch', function(event) {
         }).catch(function() {});
         return cached;
       }
-
       // 没缓存：走网络
       return fetch(event.request).then(function(resp) {
         if (resp && resp.status === 200) {
@@ -62,14 +83,7 @@ self.addEventListener('fetch', function(event) {
         }
         return resp;
       }).catch(function() {
-        // 网络失败，尝试首页兜底
-        return caches.match('./index.html').then(function(fallback) {
-          if (fallback) return fallback;
-          return new Response('请先联网加载一次以缓存页面', {
-            status: 503,
-            headers: {'Content-Type': 'text/html; charset=utf-8'}
-          });
-        });
+        return caches.match('./index.html');
       });
     })
   );

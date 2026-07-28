@@ -479,6 +479,9 @@ html.dark input,html.dark textarea,html.dark select{color:var(--text)}
 .ex-setctrl .stepper{display:flex;align-items:center}
 .ex-setctrl .stepper .step{width:24px;height:24px;border-radius:6px;background:var(--card);border:1px solid var(--border);font-size:14px;line-height:1;color:var(--text);padding:0}
 .ex-setctrl .stepper input{width:32px;background:var(--card);border:none;font-size:12px;text-align:center;color:var(--text)}
+.ex-setctrl .pr-save,.ex-setctrl .pr-del{height:24px;border-radius:7px;font-size:11px;font-weight:600;cursor:pointer;transition:.15s;padding:0 8px;line-height:24px;flex-shrink:0}
+.ex-setctrl .pr-save{background:var(--primary);color:#fff;border:none}
+.ex-setctrl .pr-del{background:rgba(239,68,68,.12);border:1px solid rgba(239,68,68,.3);color:var(--red)}
 .chart-overlay{position:fixed;inset:0;z-index:9998;background:rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center;padding:20px}
 .chart-box{background:var(--card);border-radius:16px;max-width:420px;width:100%;padding:16px;box-shadow:0 8px 30px rgba(0,0,0,.2)}
 .chart-box .cb-head{display:flex;justify-content:space-between;align-items:center;font-size:14px;font-weight:700;margin-bottom:10px}
@@ -1732,6 +1735,7 @@ function buildExerciseCard(ex,i){
     '<div class="ex-setctrl"><span class="stepper"><button type="button" class="step minus" data-f="n">−</button><input class="pr-n" type="number" min="1" value="'+(prog.sets||setsNum)+'"><button type="button" class="step plus" data-f="n">+</button></span>'+
     '<span class="pr-nl">组</span>'+
     '<button class="pr-save" data-en="'+ex.n+'">记录</button>'+
+    '<button class="pr-del" data-en="'+ex.n+'" style="display:none" title="删除今日记录">✕</button>'+
     '<span class="pr-chart" data-en="'+ex.n+'">📈 进步</span></div>';
   // 填充逐组输入行
   const srows=div.querySelector('.ex-setrows');
@@ -1789,6 +1793,33 @@ function buildExerciseCard(ex,i){
     recordExProgress(this.dataset.en,data);
     renderExercises();
   };
+  // 删除今日记录按钮
+  const delBtn=div.querySelector('.pr-del');
+  if(delBtn){
+    const dk=recKey();
+    if(prog.history&&prog.history.some(h=>h.date===dk)) delBtn.style.display='';
+    delBtn.onclick=function(){
+      const en=this.dataset.en;
+      if(!profile().exProgress)return;
+      const p=profile().exProgress[en];
+      if(!p||!p.history)return;
+      const dk=recKey();
+      const idx=p.history.findIndex(h=>h.date===dk);
+      if(idx>=0){
+        p.history.splice(idx,1);
+        if(p.history.length){
+          const last=p.history[p.history.length-1];
+          p.setsData=last.setsData||[];
+          if(p.setsData.length){
+            const s=p.setsData[p.setsData.length-1];
+            p.weight=s.weight;p.reps=s.reps;p.sets=p.setsData.length;
+          } else { delete p.weight;delete p.reps;delete p.sets; }
+        } else { delete p.setsData;delete p.weight;delete p.reps;delete p.sets; }
+        p.date=p.history.length?p.history[p.history.length-1].date:'';
+        save();renderExercises();
+      }
+    };
+  }
   // 进步曲线
   div.querySelector('.pr-chart').onclick=()=>showProgressChart(ex.n);
   return div;

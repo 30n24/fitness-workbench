@@ -13,7 +13,7 @@
 <script>
 if('serviceWorker' in navigator){
   window.addEventListener('load',function(){
-    navigator.serviceWorker.register('./sw.js?v=8').then(function(reg){
+    navigator.serviceWorker.register('./sw.js?v=9').then(function(reg){
       console.log('SW registered:',reg.scope);
     }).catch(function(e){console.log('SW failed:',e)});
   });
@@ -103,12 +103,17 @@ main{padding:14px 14px 20px;max-width:680px;margin:0 auto}
 /* 部位 */
 .parts{display:flex;gap:7px;overflow-x:auto;padding:2px 2px 8px;scroll-snap-type:x mandatory;-webkit-overflow-scrolling:touch}
 .parts::-webkit-scrollbar{display:none}
-.part{flex:0 0 auto;scroll-snap-align:start;padding:9px 14px;border-radius:14px;background:var(--card);border:1px solid var(--border);font-size:13px;font-weight:600;color:var(--muted);transition:.18s;display:flex;flex-direction:column;align-items:center;gap:3px;min-width:62px;position:relative}
+.part{flex:0 0 auto;scroll-snap-align:start;padding:9px 12px;border-radius:14px;background:var(--card);border:1px solid var(--border);font-size:13px;font-weight:600;color:var(--muted);transition:.18s;display:flex;flex-direction:column;align-items:center;gap:3px;min-width:56px;position:relative}
 .part .emoji{font-size:18px}
 .part.active{color:#fff;border-color:transparent;box-shadow:0 4px 14px rgba(0,0,0,.3)}
 .part.active.pA{background:linear-gradient(135deg,var(--pA),var(--primary-d))}
 .part.active.pB{background:linear-gradient(135deg,var(--pB),#db2777)}
 .part.done::after{content:"✓";position:absolute;top:3px;right:5px;font-size:10px;color:var(--green);font-weight:800}
+/* 部位栏「更多」折叠按钮 */
+.part-more{background:var(--bg-2);border:1px dashed var(--border);color:var(--muted)}
+.part-more .emoji{font-size:15px}
+.part-more.open{color:var(--primary);border-color:var(--primary)}
+.part-more:active{transform:scale(.95)}
 
 /* 难度 */
 .level-tabs{display:flex;background:var(--card);border:1px solid var(--border);border-radius:12px;padding:3px;margin:12px 2px 14px}
@@ -1306,6 +1311,7 @@ const KEY='fitness_workbench_v2';
 let state=load();
 let curProfile='A';
 let curPart='chest';
+let partsExpanded=false; // 部位栏折叠状态：默认只显示5个主要训练部位，其余（休息日）收进「更多」
 // levels removed
 let curDiet='low';
 let curPage='train';
@@ -1502,6 +1508,7 @@ function enterApp(){
   _inApp=true;
   // 重置当前部位与搜索
   curPart = partsList()[0].key;
+  partsExpanded=false;
   window._exSearch='';
   const sx=document.getElementById('exSearch'); if(sx)sx.value='';
   applyProfileTheme();
@@ -1531,6 +1538,7 @@ function applyProfileTheme(){
 function switchProfile(){
   curProfile = curProfile==='A'?'B':'A';
   curPart = partsList()[0].key;
+  partsExpanded=false;
   applyProfileTheme();
   renderAll();
   switchPage('train');
@@ -1567,18 +1575,32 @@ function renderTopbar(){
   document.getElementById('appTitle').textContent=`${getPName()} · 健身工作台`;
 }
 
+function makePartChip(p){
+  const done=profile().checkins[todayKey()]?.partChecked;
+  const div=document.createElement('div');
+  div.className='part'+(p.key===curPart?' active':'')+(done?' done':'');
+  div.classList.add(curProfile==='A'?'pA':'pB');
+  div.innerHTML=`<span class="emoji">${p.emoji}</span><span>${p.name}</span>`;
+  div.onclick=()=>{curPart=p.key;clearExSearch();partsExpanded=false;renderParts();renderExercises()};
+  return div;
+}
 function renderParts(){
   const bar=document.getElementById('partsBar');
   bar.innerHTML='';
-  partsList().forEach(p=>{
-    const done=profile().checkins[todayKey()]?.partChecked;
-    const div=document.createElement('div');
-    div.className='part'+(p.key===curPart?' active':'')+(done?' done':'');
-    div.classList.add(curProfile==='A'?'pA':'pB');
-    div.innerHTML=`<span class="emoji">${p.emoji}</span><span>${p.name}</span>`;
-    div.onclick=()=>{curPart=p.key;clearExSearch();renderParts();renderExercises()};
-    bar.appendChild(div);
-  });
+  const list=partsList();
+  const main=list.slice(0,5);          // 5 个主要训练部位常驻显示
+  const collapsed=list.slice(5);        // 其余（休息日等）默认折叠
+  // 当前选中部位若在被折叠集合内，则强制展开，避免选中态丢失
+  const needExpand=partsExpanded||collapsed.some(p=>p.key===curPart);
+  main.forEach(p=>bar.appendChild(makePartChip(p)));
+  if(collapsed.length){
+    if(needExpand)collapsed.forEach(p=>bar.appendChild(makePartChip(p)));
+    const tg=document.createElement('div');
+    tg.className='part part-more'+(curProfile==='A'?' pA':'pB')+(needExpand?' open':'');
+    tg.innerHTML=`<span class="emoji">${needExpand?'🔼':'➕'}</span><span>${needExpand?'收起':'更多'}</span>`;
+    tg.onclick=()=>{partsExpanded=!partsExpanded;renderParts();};
+    bar.appendChild(tg);
+  }
 }
 
 /* 构建单个动作卡片（普通渲染与虚拟滚动共用）*/

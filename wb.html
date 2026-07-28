@@ -1344,7 +1344,7 @@ const KEY='fitness_workbench_v2';
 let state=load();
 let curProfile='A';
 let curPart='chest';
-let partsExpanded=false; // 部位栏折叠状态：默认只显示5个主要训练部位，其余（休息日）收进「更多」
+let partsExpanded=false; // 部位栏：休息日始终显示；超出5个嘅其他部位先收进「更多」
 // levels removed
 let curDiet='low';
 let curPage='train';
@@ -1640,8 +1640,9 @@ function renderParts(){
   const bar=document.getElementById('partsBar');
   bar.innerHTML='';
   const list=partsList();
-  const main=list.slice(0,5);          // 5 个主要训练部位常驻显示
-  const collapsed=list.slice(5);        // 其余（休息日等）默认折叠
+  // 休息日始终显示，唔折叠；超出 5 个嘅其他部位先收进「更多」
+  const main=list.filter((p,i)=>i<5||p.key==='rest');
+  const collapsed=list.filter((p,i)=>i>=5&&p.key!=='rest');
   // 当前选中部位若在被折叠集合内，则强制展开，避免选中态丢失
   const needExpand=partsExpanded||collapsed.some(p=>p.key===curPart);
   main.forEach(p=>bar.appendChild(makePartChip(p)));

@@ -12,16 +12,9 @@
 <meta name="apple-mobile-web-app-title" content="健身工作台">
 <meta name="theme-color" content="#0f172a">
 <title>健身计划工作台</title>
+<script>window.addEventListener('error',function(e){var d=document.getElementById('diagBox');if(d){d.style.display='block';d.textContent='⚠ '+e.message;}});</script>
 <!-- PWA: 注册 Service Worker 实现离线缓存（隧道失效后仍可离线使用） -->
 <script>
-// 彻底取消 Service Worker：主动注销已安装嘅旧 SW，并唔再注册。
-// 原因：你嘅网络环境（隧道）下，SW 直接 fetch 源站会失败并 serve 旧缓存，
-//       导致刷新后显示旧版。取消 SW 后页面每次直接攞服务器最新 HTML，唔会再被旧缓存卡。
-if('serviceWorker' in navigator){
-  navigator.serviceWorker.getRegistrations().then(function(regs){
-    (regs||[]).forEach(function(r){ r.unregister(); });
-  }).catch(function(){});
-}
 // 把 topbar 实际高度同步到 --parts-top，令部位栏吸顶刚好贴住 topbar 下面
 window.syncPartsTop=function(){
   var tb=document.querySelector('.topbar');
@@ -559,6 +552,14 @@ html.dark .dash-card{background:#171f30}
 .ex-empty{text-align:center;color:var(--muted);padding:30px 12px;font-size:14px;line-height:1.6}
 .ex-empty .ex-clear{display:inline-block;margin-top:14px;padding:9px 18px;border-radius:20px;background:var(--primary);color:#fff;font-size:13px;font-weight:700;cursor:pointer;border:none}
 .ex-empty .ex-clear:active{transform:scale(.96)}
+/* 动作折叠：展开补充按钮 */
+.ex-supp-toggle{text-align:center;padding:12px;margin:10px 0;border-radius:12px;background:var(--card);border:1px dashed var(--border);color:var(--muted);font-size:13px;font-weight:600;cursor:pointer;transition:.18s}
+.ex-supp-toggle:hover,.ex-supp-toggle:active{background:var(--bg-2);color:var(--text)}
+.ex-supp-toggle.open{color:var(--primary);border-color:var(--primary)}
+.ex-supp-toggle .emoji{font-size:16px}
+/* 补充动作「换入主要」按钮 */
+.ex-main-in{display:inline-block;margin-left:6px;font-size:11px;font-weight:700;color:var(--primary);cursor:pointer;padding:2px 6px;border-radius:6px;background:rgba(79,124,255,.1);white-space:nowrap}
+.ex-main-in:active{background:var(--primary);color:#fff}
 </style>
 </head>
 <body>
@@ -1699,6 +1700,7 @@ function updateExCalBar(totalCal,doneCal,n){
 }
 
 const EX_VT=8; // 动作数超过此阈值启用虚拟滚动（仅渲染屏幕内动作）
+const EX_MAIN_COUNT=5; // 每个部位默认显示5个主要动作，其余折叠
 function renderExercises(){
   const info=partsList().find(p=>p.key===curPart);
   document.getElementById('trainIcon').textContent=info.emoji;
@@ -1736,28 +1738,86 @@ function renderExercises(){
       view=exs.map((ex,i)=>({ex,i})).filter(o=>o.ex.n.toLowerCase().includes(q)).map(o=>o.i);
     }
   }
-  // 计算热量（按完整部位）
-  let totalCal=0,doneCal=0;
-  exs.forEach((ex,i)=>{
-    const setsNum=parseInt((ex.s||'').match(/(\d+)/)?.[1]||3);
-    const exCal=(ex.cal||0)*setsNum; totalCal+=exCal;
-    if(profile().checkins[todayKey()]?.exercises?.[curPart]?.[i])doneCal+=exCal;
-  });
-  updateExCalBar(totalCal,doneCal,exs.length);
-  // 渲染：长列表虚拟滚动，否则普通渲染；搜索无结果时提示
-  if(view.length===0){
+  // === 显示5个主要动作+其余折叠 ===
+  // 搜索时显示全部匹配，唔折叠
+  const isSearching = !!window._exSearch;
+  // 空搜索结果
+  if (view.length===0 && isSearching) {
     exitVirtual(list);
     list.innerHTML='<div class="ex-empty">😶 没有匹配「'+window._exSearch+'」的动作<br><button class="ex-clear" id="exClearBtn">✕ 清除搜索</button></div>';
     const cb=list.querySelector('#exClearBtn');
     if(cb)cb.onclick=function(){clearExSearch();renderExercises();};
     return;
   }
-  if(view.length>EX_VT){
-    renderExVirtual(list,exs,view);
+  let showIndices;
+  if (isSearching) {
+    showIndices = view; // 全部匹配项
   } else {
-    exitVirtual(list);
-    list.innerHTML='';
-    view.forEach(i=>list.appendChild(buildExerciseCard(exs[i],i)));
+    // 默认顺序（可被换入操作修改）
+    if (!profile().exMainOrder) profile().exMainOrder = {};
+    const order = profile().exMainOrder[curPart];
+    if (!order) {
+      // 首次：建立自然顺序
+      profile().exMainOrder[curPart] = view.slice();
+    }
+    showIndices = profile().exMainOrder[curPart].slice();
+    // 只显示有效的（该部位可能换了内容）
+    showIndices = showIndices.filter(i => i < exs.length);
+  }
+  // 显示5个主要 + 补充(折叠)
+  const mainIdx = showIndices.slice(0, Math.min(EX_MAIN_COUNT, showIndices.length));
+  const suppIdx = showIndices.slice(mainIdx.length);
+  const showSupp = window._exSuppOpen === curPart && suppIdx.length > 0 && !isSearching;
+
+  // 热量：按全部（已考虑顺序）
+  let totalCal=0,doneCal=0;
+  showIndices.forEach(i=>{
+    const setsNum=parseInt((exs[i].s||'').match(/(\d+)/)?.[1]||3);
+    const exCal=(exs[i].cal||0)*setsNum; totalCal+=exCal;
+    if(profile().checkins[todayKey()]?.exercises?.[curPart]?.[i])doneCal+=exCal;
+  });
+  updateExCalBar(totalCal,doneCal,exs.length);
+  renderExerciseCards(list, exs, mainIdx, suppIdx, showSupp, isSearching);
+}
+function renderExerciseCards(list, exs, mainIdx, suppIdx, showSupp, isSearching){
+  exitVirtual(list);
+  list.innerHTML='';
+  // 主要动作（5个）
+  mainIdx.forEach(i=>list.appendChild(buildExerciseCard(exs[i], i)));
+  // 补充动作折叠
+  if (suppIdx.length > 0 && !isSearching) {
+    const toggle = document.createElement('div');
+    toggle.className='ex-supp-toggle'+(showSupp?' open':'');
+    toggle.innerHTML='<span>'+(showSupp?'🔼 收起补充 ('+suppIdx.length+'个)':'📂 展开补充 ('+suppIdx.length+'个)')+'</span>';
+    toggle.onclick=function(){
+      window._exSuppOpen = showSupp ? '' : curPart;
+      renderExercises();
+    };
+    list.appendChild(toggle);
+    if (showSupp) {
+      suppIdx.forEach(j=>{
+        const card = buildExerciseCard(exs[j], j);
+        // 加「⬆ 换入主要」按钮
+        const swapBtn = document.createElement('span');
+        swapBtn.className='ex-main-in';
+        swapBtn.textContent='⬆ 换入主要';
+        swapBtn.onclick=function(){
+          const order = profile().exMainOrder[curPart].slice();
+          // 搵到呢个补充动作喺顺序中的位置，同第5个主要互换
+          const mainPos = Math.min(EX_MAIN_COUNT, order.length) - 1; // 第5个位置 index=4
+          const suppPos = order.indexOf(j);
+          if (suppPos > mainPos) {
+            order[suppPos] = order[mainPos];
+            order[mainPos] = j;
+          }
+          profile().exMainOrder[curPart] = order;
+          save();
+          renderExercises();
+        };
+        card.querySelector('.ex-meta').appendChild(swapBtn);
+        list.appendChild(card);
+      });
+    }
   }
 }
 function exitVirtual(list){

@@ -1,9 +1,9 @@
-// 健身计划工作台 Service Worker - 离线缓存 v2
+// 健身计划工作台 Service Worker - 离线缓存 v3
 // 策略：缓存优先 + 后台更新 + 错误回退（确保离线/隧道失效时都能用）
-const CACHE_NAME = 'fitness-workbench-v2';
+const CACHE_NAME = 'fitness-workbench-v3';
 const CACHE_URLS = [
   './',
-  './健身计划工作台.html',
+  './index.html',
   './sw.js'
 ];
 
@@ -63,7 +63,7 @@ self.addEventListener('fetch', function(event) {
         return resp;
       }).catch(function() {
         // 网络失败，尝试首页兜底
-        return caches.match('./健身计划工作台.html').then(function(fallback) {
+        return caches.match('./index.html').then(function(fallback) {
           if (fallback) return fallback;
           return new Response('请先联网加载一次以缓存页面', {
             status: 503,

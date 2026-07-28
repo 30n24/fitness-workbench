@@ -14,7 +14,7 @@
 if('serviceWorker' in navigator){
   let _swPendingReload=false;
   window.addEventListener('load',function(){
-    navigator.serviceWorker.register('./sw.js?v=11').then(function(reg){
+    navigator.serviceWorker.register('./sw.js?v=12').then(function(reg){
       // 已有等待中的新版本，立即激活
       if(reg.waiting){_swPendingReload=true;reg.waiting.postMessage({type:'SKIP_WAITING'});}
       reg.onupdatefound=function(){
@@ -33,6 +33,18 @@ if('serviceWorker' in navigator){
     if(_swPendingReload)window.location.reload();
   });
 }
+// 把 topbar 实际高度同步到 --parts-top，令部位栏吸顶刚好贴住 topbar 下面
+(function(){
+  function sync(){
+    var tb=document.querySelector('.topbar');
+    if(tb)document.documentElement.style.setProperty('--parts-top',tb.offsetHeight+'px');
+  }
+  sync();
+  window.addEventListener('resize',sync);
+  document.addEventListener('DOMContentLoaded',sync);
+  setTimeout(sync,300);
+  setTimeout(sync,1000);
+})();
 </script>
 <style>
 /* 首屏 Loading - 内联最优先，避免白屏 */
@@ -116,7 +128,8 @@ main{padding:14px 14px 20px;max-width:680px;margin:0 auto}
 .section-title .hint{font-size:11px;font-weight:400}
 
 /* 部位 */
-.parts{display:flex;gap:7px;overflow-x:auto;padding:2px 2px 8px;scroll-snap-type:x mandatory;-webkit-overflow-scrolling:touch}
+.parts{display:flex;gap:7px;overflow-x:auto;padding:8px 2px;scroll-snap-type:x mandatory;-webkit-overflow-scrolling:touch;position:sticky;top:var(--parts-top,60px);z-index:18;background:var(--bg);border-bottom:1px solid var(--border)}
+#exerciseList{scroll-margin-top:calc(var(--parts-top,60px) + 14px)}
 .parts::-webkit-scrollbar{display:none}
 .part{flex:0 0 auto;scroll-snap-align:start;padding:9px 12px;border-radius:14px;background:var(--card);border:1px solid var(--border);font-size:13px;font-weight:600;color:var(--muted);transition:.18s;display:flex;flex-direction:column;align-items:center;gap:3px;min-width:56px;position:relative}
 .part .emoji{font-size:18px}
@@ -1596,7 +1609,7 @@ function makePartChip(p){
   div.className='part'+(p.key===curPart?' active':'')+(done?' done':'');
   div.classList.add(curProfile==='A'?'pA':'pB');
   div.innerHTML=`<span class="emoji">${p.emoji}</span><span>${p.name}</span>`;
-  div.onclick=()=>{curPart=p.key;clearExSearch();partsExpanded=false;renderParts();renderExercises()};
+  div.onclick=()=>{curPart=p.key;clearExSearch();partsExpanded=false;renderParts();renderExercises();var ex=document.getElementById('exerciseList');if(ex)ex.scrollIntoView({behavior:'smooth',block:'start'});};
   return div;
 }
 function renderParts(){

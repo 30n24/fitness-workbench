@@ -1,7 +1,7 @@
 // 健身计划工作台 Service Worker - 离线缓存 v11
 // 策略：HTML 文档「网络优先」（保证每次都系最新版）+ 其余静态资源「缓存优先 + 后台更新」
 //       离线/隧道失效时自动回退缓存，确保仍可用
-const CACHE_NAME = 'fitness-workbench-v11';
+const CACHE_NAME = 'fitness-workbench-v12';
 const CACHE_URLS = [
   './',
   './index.html',

@@ -13,7 +13,7 @@
 <script>
 if('serviceWorker' in navigator){
   window.addEventListener('load',function(){
-    navigator.serviceWorker.register('./sw.js?v=7').then(function(reg){
+    navigator.serviceWorker.register('./sw.js?v=8').then(function(reg){
       console.log('SW registered:',reg.scope);
     }).catch(function(e){console.log('SW failed:',e)});
   });
@@ -160,7 +160,8 @@ main{padding:14px 14px 20px;max-width:680px;margin:0 auto}
 .cardio-card select:focus{border-color:var(--accent)}
 .cardio-card input[type=number]{width:70px;background:var(--bg-2);border:1px solid var(--border);border-radius:10px;padding:9px 8px;color:var(--text);font-size:13px;text-align:center;outline:none}
 .cardio-card input[type=number]:focus{border-color:var(--accent)}
-.cardio-card .row{display:flex;gap:8px;align-items:center;margin-bottom:8px}
+.cardio-card .row{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:8px}
+.cardio-card .row input[type=number]{flex:0 0 auto;width:62px}
 .cardio-card .save-btn{padding:9px 14px;border-radius:10px;background:var(--accent);color:#fff;font-size:12px;font-weight:600;transition:.18s;white-space:nowrap}
 .cardio-card .save-btn:active{transform:scale(.95)}
 .cardio-card .save-btn.saved{background:var(--green)}
@@ -663,8 +664,12 @@ html.dark .dash-card{background:#171f30}
         <option value="跳绳">跳绳</option>
         <option value="爬楼梯">爬楼梯</option>
       </select>
-      <input type="number" id="cardioDuration" placeholder="时长" min="0" max="300">
-      <span class="unit">分钟</span>
+      <input type="number" id="cardioDuration" placeholder="时长" min="0" max="600">
+      <span class="unit">分</span>
+      <input type="number" id="cardioDist" placeholder="里程" min="0" step="0.1">
+      <span class="unit">km</span>
+      <input type="number" id="cardioIncline" placeholder="坡度" min="0" step="0.5" style="display:none">
+      <span class="unit" id="cardioInclineUnit" style="display:none">%</span>
       <button class="save-btn" id="cardioSave">添加</button>
     </div>
     <div class="cardio-list" id="cardioList"></div>
@@ -1833,12 +1838,11 @@ function renderStats(){
     Object.keys(data.badminton).forEach(k=>{
       if(k.startsWith(mk)){bdDays++;bdMins+=data.badminton[k].duration||0;totalCal+=(data.badminton[k].duration||0)*7}
     });
-    const CARDIO_CAL_S={'慢跑':9,'爬坡':11,'快跑':13,'滑雪机':12,'划船机':10,'椭圆机':8,'动感单车':10,'跳绳':12,'爬楼梯':11};
     Object.keys(data.cardio||{}).forEach(k=>{
       if(k.startsWith(mk)){
         (data.cardio[k]||[]).forEach(c=>{
           cardioDays++;cardioMins+=c.duration||0;
-          totalCal+=(c.duration||0)*(CARDIO_CAL_S[c.type]||8);
+          totalCal+=cardioCalOf(c);
         });
       }
     });
@@ -2351,9 +2355,8 @@ function renderCalorieSummary(){
   const dn=(profile().dinner?.[k]||[]).reduce((s,it)=>s+((typeof it==='object'?it.cal:(DINNER_MENU[it]?.cal||0))||0),0);
   const eo=(profile().eatOut?.[k]||[]).reduce((s,it)=>s+it.cal,0);
   const foodCal=bf+ln+dn+eo;
-  const CARDIO_CAL_S={'慢跑':9,'爬坡':11,'快跑':13,'滑雪机':12,'划船机':10,'椭圆机':8,'动感单车':10,'跳绳':12,'爬楼梯':11};
   let exCal=0;
-  (profile().cardio?.[k]||[]).forEach(c=>exCal+=(c.duration||0)*(CARDIO_CAL_S[c.type]||8));
+  (profile().cardio?.[k]||[]).forEach(c=>exCal+=cardioCalOf(c));
   const bd=profile().badminton?.[k];if(bd)exCal+=bd.duration*7;
   const calBar=document.getElementById('calBar'),calTotal=document.getElementById('calTotal'),calDetail=document.getElementById('calDetail');
   if(calBar){
@@ -2370,15 +2373,46 @@ function renderBadminton(){
   saveBtn.onclick=()=>{const d=parseInt(inp.value);if(!d||d<=0)return;profile().badminton[k]={duration:d};save();renderBadminton();renderCalorieSummary();if(curPage==='stats')renderStats();};
   delBtn.onclick=()=>{delete profile().badminton[k];save();renderBadminton();renderCalorieSummary();if(curPage==='stats')renderStats();};
 }
+/* 有氧热量模型：机器显示里程（滑雪机/跑步机），热量由 里程+坡度+速度 综合得出，
+   不能只按时长估算。故优先用里程；跑步机类用时长则走 ACSM 公式（结合体重/速度/坡度）。 */
+const CARDIO={
+  '慢跑':{cpm:9,cpk:62,inc:true},'爬坡':{cpm:11,cpk:80,inc:true},'快跑':{cpm:13,cpk:95,inc:true},
+  '滑雪机':{cpm:12,cpk:90,inc:false},'划船机':{cpm:10,cpk:70,inc:false},'椭圆机':{cpm:8,cpk:52,inc:false},
+  '动感单车':{cpm:10,cpk:45,inc:false},'跳绳':{cpm:12,cpk:0,inc:false},'爬楼梯':{cpm:11,cpk:0,inc:false}
+};
+const CARDIO_INC_TYPES={'慢跑':1,'爬坡':1,'快跑':1};
+function calcCardioCal(type,dur,dist,inc,weight){
+  const c=CARDIO[type]; if(!c) return 0;
+  const hasD=dist>0, hasT=dur>0;
+  // 跑步机类且同时有「时长+里程」：可算出真实配速，用 ACSM 公式（体重+速度+坡度）最准
+  if(c.inc && hasT && hasD){
+    const speedKmh=dist/(dur/60);
+    const v=speedKmh*1000/60;                       // m/min
+    const grade=(inc||0)/100;
+    const vo2=3.5+0.2*v+0.9*v*grade;               // ACSM 跑步 VO2
+    const met=vo2/3.5;
+    return Math.round(met*(weight||60)*(dur/60));
+  }
+  // 有里程：按每公里速率（坡度类加成），机器里程最可靠
+  if(hasD && c.cpk>0){
+    let rate=c.cpk;
+    if(c.inc && inc>0) rate*=(1+inc/100*0.6);       // 坡度约每 1% 加 0.6 倍率
+    return Math.round(dist*rate);
+  }
+  // 仅时长：沿用每分钟估算（兼容旧数据 / 跳绳爬楼等无里程项目）
+  if(hasT) return Math.round(dur*(c.cpm||8));
+  return 0;
+}
+function cardioCalOf(c){ return c.cal!=null?c.cal:Math.round((c.duration||0)*((CARDIO[c.type]&&CARDIO[c.type].cpm)||8)); }
 function renderCardio(){
   const k=todayKey();
   const list=profile().cardio?.[k]||[];
   const el=document.getElementById('cardioList');el.innerHTML='';
-  const CARDIO_CAL_S={'慢跑':9,'爬坡':11,'快跑':13,'滑雪机':12,'划船机':10,'椭圆机':8,'动感单车':10,'跳绳':12,'爬楼梯':11};
   list.forEach((c,i)=>{
-    const cal=(c.duration||0)*(CARDIO_CAL_S[c.type]||8);
+    const cal=cardioCalOf(c);
+    const meta=[c.duration?c.duration+'分':'', c.dist?(c.dist+'km'):'', (c.inc?c.inc+'%':'')].filter(Boolean).join(' · ');
     const div=document.createElement('div');div.className='ci';
-    div.innerHTML=`<span class="cn">${c.type} ${c.duration}分</span><span class="cc">${cal}kcal</span><span class="cd">🔥</span><span class="del" data-i="${i}">✕</span>`;
+    div.innerHTML=`<span class="cn">${c.type}${meta?' '+meta:''}</span><span class="cc">${cal}kcal</span><span class="cd">🔥</span><span class="del" data-i="${i}">✕</span>`;
     div.querySelector('.del').onclick=()=>{const a=profile().cardio[k]||[];a.splice(i,1);profile().cardio[k]=a;save();renderCardio();renderCalorieSummary();};
     el.appendChild(div);
   });
@@ -2628,16 +2662,34 @@ document.getElementById('importFile').onchange=(e)=>{
   reader.readAsText(file);
 };
 // 有氧运动
+function toggleCardioIncline(){
+  const t=document.getElementById('cardioType').value;
+  const show=!!CARDIO_INC_TYPES[t];
+  const w=document.getElementById('cardioIncline'), u=document.getElementById('cardioInclineUnit');
+  if(w)w.style.display=show?'':'none';
+  if(u)u.style.display=show?'':'none';
+}
+document.getElementById('cardioType').addEventListener('change',toggleCardioIncline);
 document.getElementById('cardioSave').onclick=()=>{
   const type=document.getElementById('cardioType').value;
-  const dur=parseInt(document.getElementById('cardioDuration').value);
-  if(!dur||dur<=0)return;
+  const dur=parseFloat(document.getElementById('cardioDuration').value)||0;
+  const dist=parseFloat(document.getElementById('cardioDist').value)||0;
+  const inc=parseFloat(document.getElementById('cardioIncline').value)||0;
+  if(dur<=0 && dist<=0)return;
+  const weight=latestWeight(curProfile)||60;
+  const cal=calcCardioCal(type,dur,dist,inc,weight);
   if(!profile().cardio[todayKey()])profile().cardio[todayKey()]=[];
-  profile().cardio[todayKey()].push({type,duration:dur});
+  profile().cardio[todayKey()].push({type,duration:dur,dist,inc,cal});
   save();
   document.getElementById('cardioDuration').value='';
+  document.getElementById('cardioDist').value='';
+  document.getElementById('cardioIncline').value='';
   renderCardio();renderCalorieSummary();
+  const basis=dist>0?('里程 '+dist+'km'+(inc>0?(' · 坡度'+inc+'%'):'')):('时长 '+dur+'分');
+  const wnote=latestWeight(curProfile)?'':('（体重按60kg估算，可在「身体」页填写更准）');
+  showFoodHint('🔥 '+type+' 按'+basis+' 估算 '+cal+'kcal'+wnote);
 };
+toggleCardioIncline();
 // 早餐添加
 document.getElementById('breakfastAdd').onclick=()=>{
   const name=document.getElementById('breakfastInput').value.trim();

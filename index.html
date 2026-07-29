@@ -4035,15 +4035,15 @@ function parseExPerf(text){
   // 次数序列：12/10/8/6次
   const rm=s.match(/((?:\d+(?:\.\d+)?(?:[、/→\-]|->))+\d+(?:\.\d+)?)\s*次/i);
   if(rm){ rSeq=rm[1].split(sep).map(Number); s=s.replace(rm[0],' '); }
-  let weight=null;
-  const wm2=s.match(/(\d+(?:\.\d+)?)\s*(?:kg|公斤|千克|磅|jin|斤)/i);
-  if(wm2){weight=parseFloat(wm2[1]); if(/磅/i.test(wm2[0]))weight*=0.4536; s=s.replace(wm2[0],' ');}
-  if(wSeq&&wSeq.length)weight=wSeq[wSeq.length-1];
-  let sets=null,reps=null;
-  const chain=s.match(/(\d+)\s*[x×X*]\s*(\d+)\s*[x×X*]\s*(\d+)/);
-  if(chain){if(sets==null)sets=parseInt(chain[1]);reps=parseInt(chain[2]);if(weight==null)weight=parseFloat(chain[3]);}
+  // 链式 组x次x负重（支持带单位后缀），优先于单重量匹配，避免单重量被提前删除破坏解析
+  let sets=null,reps=null,weight=null;
+  const chain=s.match(/(\d+)\s*[x×X*]\s*(\d+)\s*[x×X*]\s*(\d+(?:\.\d+)?)\s*(kg|公斤|千克|磅|jin|斤)?/i);
+  if(chain){ if(sets==null)sets=parseInt(chain[1]); reps=parseInt(chain[2]); let w=parseFloat(chain[3]); if(chain[4]&&/磅/i.test(chain[4]))w*=0.4536; weight=w; s=s.replace(chain[0],' '); }
   const sm=s.match(/(\d+)\s*组/); if(sm&&sets==null)sets=parseInt(sm[1]);
   const rm2=s.match(/(\d+)\s*次/); if(rm2&&reps==null)reps=parseInt(rm2[1]);
+  const wm2=s.match(/(\d+(?:\.\d+)?)\s*(?:kg|公斤|千克|磅|jin|斤)/i);
+  if(wm2){ if(weight==null){weight=parseFloat(wm2[1]); if(/磅/i.test(wm2[0]))weight*=0.4536;} s=s.replace(wm2[0],' '); }
+  if(wSeq&&wSeq.length)weight=wSeq[wSeq.length-1];
   let detail=null;
   if(wSeq||rSeq){
     const n=Math.max(wSeq?wSeq.length:0, rSeq?rSeq.length:0, sets||0);

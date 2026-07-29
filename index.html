@@ -442,7 +442,7 @@ html.dark{--bg:#0f1420;--bg-2:#171c2b;--card:#1a2030;--card-2:#141a28;--border:#
 html.dark .topbar,html.dark .tabbar{background:rgba(20,26,40,.92)}
 html.dark .select-page{background:#0f1420}
 html.dark #appLoader{background:#0f1420}
-html.dark input,html.dark textarea,html.dark select{color:var(--text)}
+html.dark input,html.dark textarea,html.dark select{color:var(--text);background:var(--bg-2)}
 
 /* ===== 主题切换按钮 ===== */
 .theme-btn{width:34px;height:34px;border-radius:10px;background:var(--card);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0;transition:.18s}
@@ -3321,21 +3321,26 @@ function renderCardio(){
   });
 }
 
-/* ===== 新功能：主题 / 饮水 / 身体 / 进步曲线 / 自定义食物 / 报告 ===== */
+/* ===== 三档主题：浅色 / 深色 / 跟随系统 ===== */
+function systemDark(){return window.matchMedia('(prefers-color-scheme:dark)').matches}
 function applyTheme(){
-  const t=localStorage.getItem('fw_theme')||'light';
-  document.documentElement.classList.toggle('dark',t==='dark');
+  const t=localStorage.getItem('fw_theme')||'system';
+  const isDark=t==='dark'||(t==='system'&&systemDark());
+  document.documentElement.classList.toggle('dark',isDark);
   const btn=document.getElementById('themeBtn');
-  if(btn)btn.textContent=t==='dark'?'☀️':'🌙';
+  if(btn){const icons={light:'☀️',dark:'🌙',system:'🔄'};btn.textContent=icons[t]||'🔄';btn.title=t==='system'?'跟随系统':(t==='dark'?'深色':'浅色');}
 }
 function toggleTheme(){
-  const cur=document.documentElement.classList.contains('dark');
-  const next=cur?'light':'dark';
+  const cur=localStorage.getItem('fw_theme')||'system';
+  const next=cur==='light'?'dark':(cur==='dark'?'system':'light');
   localStorage.setItem('fw_theme',next);
-  document.documentElement.classList.toggle('dark',next==='dark');
-  const btn=document.getElementById('themeBtn');if(btn)btn.textContent=next==='dark'?'☀️':'🌙';
-  showFoodHint(next==='dark'?'已切换深色模式':'已切换浅色模式');
+  applyTheme();
+  showFoodHint(next==='dark'?'已切换深色模式':(next==='light'?'已切换浅色模式':'已设为跟随系统'));
 }
+// 系统主题变更时自动跟随
+window.matchMedia('(prefers-color-scheme:dark)').addEventListener('change',()=>{
+  if(localStorage.getItem('fw_theme')==='system')applyTheme();
+});
 
 /* 饮水目标（科学公式：ml 为单位）
    男 35ml/kg · 女 30ml/kg · 未知 33ml/kg；活动水平校正；+1=250ml */

@@ -562,7 +562,7 @@ html.dark input[type="search"]{background:var(--bg-2)}
 .report-card .rc-stat:last-child{border-bottom:none}
 .report-card .rc-stat .rk{color:var(--muted)}
 .report-card .rc-stat .rv{font-weight:700}
-.report-card .rc-canvas{width:100%;height:200px;display:block;margin:14px 0}
+.report-card .rc-canvas{width:100%;height:260px;display:block;margin:14px 0}
 .report-card .rc-close{margin-top:16px;width:100%;padding:13px;border-radius:12px;background:var(--bg-2);border:1px solid var(--border);font-size:15px;font-weight:600;color:var(--text);text-align:center;cursor:pointer}
 
 /* 同步状态小图标 */
@@ -3641,30 +3641,30 @@ function drawPartBars(canvas,partDays){
   const ctx=canvas.getContext('2d');
   const dpr=window.devicePixelRatio||1;
   const W=canvas.clientWidth||canvas.parentElement.clientWidth||300;
-  const H=220;
+  const H=260;
   canvas.width=W*dpr;canvas.height=H*dpr;ctx.setTransform(dpr,0,0,dpr,0,0);
   ctx.clearRect(0,0,W,H);
   const css=getComputedStyle(document.documentElement);
   const textColor=css.getPropertyValue('--text').trim()||'#e8edf6';
   const mutedColor=css.getPropertyValue('--muted').trim()||'#94a0b8';
   const max=Math.max(1,...TRAIN_PARTS.map(p=>partDays[p.key]||0));
-  const barH=26;const gap=10;const top=20;const left=55;const right=20;
+  const barH=32;const gap=12;const top=18;const left=68;const right=20;
   const bw=W-left-right;
-  ctx.font='12px sans-serif';ctx.textBaseline='middle';
+  ctx.font='13px sans-serif';ctx.textBaseline='middle';
   TRAIN_PARTS.forEach((p,i)=>{
     const y=top+i*(barH+gap);
     const v=partDays[p.key]||0;
     const w=bw*(v/max);
     // label
-    ctx.fillStyle=textColor;ctx.textAlign='right';ctx.fillText(p.emoji+' '+p.name,left-6,y+barH/2);
+    ctx.fillStyle=textColor;ctx.textAlign='right';ctx.fillText(p.emoji+' '+p.name,left-8,y+barH/2);
     // bar bg
-    ctx.fillStyle=mutedColor+'1f';ctx.beginPath();ctx.roundRect(left,y,bw,barH,5);ctx.fill();
+    ctx.fillStyle=mutedColor+'1f';ctx.beginPath();ctx.roundRect(left,y,bw,barH,6);ctx.fill();
     // bar fill
     const colors=['#5b8cff','#22d3ee','#34d399','#f472b6','#a78bfa'];
-    ctx.fillStyle=colors[i%colors.length];ctx.beginPath();ctx.roundRect(left,y,w,barH,5);ctx.fill();
+    ctx.fillStyle=colors[i%colors.length];ctx.beginPath();ctx.roundRect(left,y,w,barH,6);ctx.fill();
     // value：阔条时文字放条内靠右，窄条时放条外靠左（确保不超 canvas）
-    if(w>50){ctx.textAlign='right';ctx.fillStyle='rgba(255,255,255,.8)';ctx.fillText(v+'天',left+w-6,y+barH/2);}
-    else{ctx.textAlign='left';ctx.fillStyle='#fff';ctx.fillText(v+'天',Math.min(left+w+6, W-right-20),y+barH/2);}
+    if(w>50){ctx.textAlign='right';ctx.fillStyle='rgba(255,255,255,.95)';ctx.fillText(v+'次',left+w-8,y+barH/2);}
+    else{ctx.textAlign='left';ctx.fillStyle=textColor;ctx.fillText(v+'次',Math.min(left+w+6, W-right-20),y+barH/2);}
   });
 }
 

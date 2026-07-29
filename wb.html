@@ -1873,8 +1873,25 @@ function setSyncStatus(s){
 }
 
 /* ===== 选人页 ===== */
+// 清理虚假打卡：过往日期只有已打卡标记但无任何训练记录/cardio，视为数据污染
+function cleanupStaleCheckins(){
+  ['A','B'].forEach(p=>{
+    const cks=state[p]?.checkins; if(!cks)return;
+    Object.keys(cks).forEach(k=>{
+      if(k===todayKey())return;
+      const c=cks[k];
+      if(c&&c.partChecked&&!c.rest){
+        const hasEx=state[p].customEx?.[k]?.length>0;
+        const hasCardio=state[p].cardio?.[k]?.length>0;
+        if(!hasEx&&!hasCardio) delete cks[k];
+      }
+    });
+  });
+  saveLocal();
+}
 function initSelectPage(){
   _inApp=false;
+  cleanupStaleCheckins();
   applyTheme();
   document.getElementById('nameA').value=state.A.name||'';
   document.getElementById('nameB').value=state.B.name||'';
@@ -1896,7 +1913,7 @@ function initSelectPage(){
   // 首页打开即强制拉取云端并显示概要（解决主屏首屏看不到数据）
   if(cloudReady()){
     setTimeout(async()=>{
-      try{ await forcePull(); renderHomeDash(); }
+      try{ await forcePull(); cleanupStaleCheckins(); renderHomeDash(); }
       catch(e){}
     },300);
   }
@@ -1996,7 +2013,7 @@ function enterApp(){
     setTimeout(async()=>{
       try{
         showFoodHint('☁ 正在云端同步…请稍候');
-        await forcePull();
+        await forcePull(); cleanupStaleCheckins();
         renderAll();
         setSyncStatus('ok');
         showFoodHint('☁ 已同步到云端最新数据');

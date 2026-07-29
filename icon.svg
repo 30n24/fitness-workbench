@@ -2,58 +2,51 @@
   <defs>
     <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
       <stop offset="0%" stop-color="#5b8cff"/>
-      <stop offset="50%" stop-color="#4b7be5"/>
+      <stop offset="40%" stop-color="#4b7be5"/>
       <stop offset="100%" stop-color="#22d3ee"/>
     </linearGradient>
     <linearGradient id="cat" x1="0%" y1="0%" x2="100%" y2="100%">
       <stop offset="0%" stop-color="#ffffff"/>
-      <stop offset="100%" stop-color="#e0f2fe"/>
+      <stop offset="100%" stop-color="#cce7ff"/>
     </linearGradient>
   </defs>
-  <!-- 圆角背景 -->
-  <rect width="512" height="512" rx="96" fill="url(#bg)"/>
-  <!-- 猫仔举哑铃 -->
-  <g transform="translate(256,268)">
-    <!-- 尾巴 -->
-    <path d="M-40,60 Q-70,50 -80,20 Q-85,0 -70,-10 Q-55,-15 -50,0" fill="none" stroke="url(#cat)" stroke-width="14" stroke-linecap="round"/>
-    <!-- 身体 -->
-    <ellipse cx="0" cy="40" rx="52" ry="48" fill="url(#cat)" opacity=".92"/>
-    <!-- 头部 -->
-    <circle cx="0" cy="-20" r="44" fill="url(#cat)" opacity=".95"/>
+  <rect width="512" height="512" rx="100" fill="url(#bg)"/>
+  <!-- 猫仔健身动作剪影 — 单手推举哑铃 -->
+  <g transform="translate(238,260)">
+    <!-- 尾巴卷曲 -->
+    <path d="M-34,56 C-56,56 -74,40 -74,18 C-74,0 -56,-6 -44,4" fill="none" stroke="url(#cat)" stroke-width="14" stroke-linecap="round" opacity=".85"/>
+    <!-- 团身（臀部） -->
+    <ellipse cx="0" cy="44" rx="44" ry="38" fill="url(#cat)" opacity=".88"/>
+    <!-- 身体（向上延展） -->
+    <ellipse cx="0" cy="0" rx="40" ry="48" fill="url(#cat)" opacity=".92"/>
+    <!-- 左臂自然垂下 -->
+    <path d="M-32,-8 C-44,2 -50,24 -42,34" fill="none" stroke="url(#cat)" stroke-width="13" stroke-linecap="round"/>
+    <!-- 右臂举起撑哑铃（弧形向上推） -->
+    <path d="M28,-12 C40,-26 36,-56 16,-74 C6,-84 -4,-84 -10,-78" fill="none" stroke="url(#cat)" stroke-width="13" stroke-linecap="round"/>
+    <!-- 猫头（圆润） -->
+    <circle cx="-2" cy="-32" r="32" fill="url(#cat)"/>
     <!-- 左耳 -->
-    <path d="M-36,-48 L-48,-90 L-14,-50 Z" fill="url(#cat)" opacity=".95"/>
+    <path d="M-28,-52 C-34,-74 -42,-92 -32,-94 C-24,-96 -20,-82 -18,-60 Z" fill="url(#cat)"/>
     <!-- 右耳 -->
-    <path d="M36,-48 L48,-90 L14,-50 Z" fill="url(#cat)" opacity=".95"/>
-    <!-- 耳内三角 -->
-    <path d="M-34,-52 L-42,-78 L-18,-50 Z" fill="rgba(255,255,255,.4)"/>
-    <path d="M34,-52 L42,-78 L18,-50 Z" fill="rgba(255,255,255,.4)"/>
-    <!-- 眼睛 -->
-    <ellipse cx="-16" cy="-22" rx="6" ry="8" fill="rgba(91,140,255,.5)"/>
-    <ellipse cx="16" cy="-22" rx="6" ry="8" fill="rgba(91,140,255,.5)"/>
-    <!-- 瞳孔 -->
-    <ellipse cx="-16" cy="-22" rx="3" ry="5" fill="rgba(91,140,255,.8)"/>
-    <ellipse cx="16" cy="-22" rx="3" ry="5" fill="rgba(91,140,255,.8)"/>
-    <!-- 鼻子 -->
-    <path d="M-4,-8 L0,-4 L4,-8 Z" fill="rgba(91,140,255,.4)"/>
-    <!-- 嘴巴 -->
-    <path d="M0,-4 Q-12,4 -16,0" fill="none" stroke="rgba(91,140,255,.25)" stroke-width="2" stroke-linecap="round"/>
-    <path d="M0,-4 Q12,4 16,0" fill="none" stroke="rgba(91,140,255,.25)" stroke-width="2" stroke-linecap="round"/>
+    <path d="M16,-52 C16,-74 8,-92 18,-94 C26,-96 28,-82 26,-60 Z" fill="url(#cat)"/>
+    <!-- 耳内 -->
+    <path d="M-26,-56 C-30,-72 -36,-84 -30,-86 C-24,-88 -22,-78 -20,-62 Z" fill="rgba(255,255,255,.35)"/>
+    <path d="M18,-56 C18,-72 12,-84 18,-86 C24,-88 26,-78 24,-62 Z" fill="rgba(255,255,255,.35)"/>
+    <!-- 眯眯眼（用力感） -->
+    <path d="M-14,-34 Q-10,-38 -6,-34" fill="none" stroke="rgba(91,140,255,.55)" stroke-width="2.5" stroke-linecap="round"/>
+    <path d="M6,-34 Q10,-38 14,-34" fill="none" stroke="rgba(91,140,255,.55)" stroke-width="2.5" stroke-linecap="round"/>
+    <!-- 小鼻子 -->
+    <ellipse cx="-2" cy="-26" rx="3" ry="2" fill="rgba(91,140,255,.35)"/>
     <!-- 胡须 -->
-    <line x1="-20" y1="-12" x2="-46" y2="-18" stroke="rgba(255,255,255,.5)" stroke-width="2.5" stroke-linecap="round"/>
-    <line x1="-20" y1="-8" x2="-46" y2="-6" stroke="rgba(255,255,255,.5)" stroke-width="2.5" stroke-linecap="round"/>
-    <line x1="20" y1="-12" x2="46" y2="-18" stroke="rgba(255,255,255,.5)" stroke-width="2.5" stroke-linecap="round"/>
-    <line x1="20" y1="-8" x2="46" y2="-6" stroke="rgba(255,255,255,.5)" stroke-width="2.5" stroke-linecap="round"/>
-    <!-- 左手举哑铃 -->
-    <path d="M-38,10 Q-58,-10 -52,-30" fill="none" stroke="url(#cat)" stroke-width="12" stroke-linecap="round"/>
-    <!-- 右手举哑铃 -->
-    <path d="M38,10 Q58,-10 52,-30" fill="none" stroke="url(#cat)" stroke-width="12" stroke-linecap="round"/>
-    <!-- 哑铃杆 -->
-    <rect x="-90" y="-52" width="180" height="18" rx="9" fill="rgba(255,255,255,.85)" filter="drop-shadow(0 3px 6px rgba(0,0,0,.12))"/>
-    <!-- 左哑铃片 -->
-    <rect x="-78" y="-76" width="22" height="66" rx="6" fill="rgba(255,255,255,.5)"/>
-    <rect x="-70" y="-68" width="14" height="50" rx="5" fill="rgba(255,255,255,.6)"/>
-    <!-- 右哑铃片 -->
-    <rect x="56" y="-76" width="22" height="66" rx="6" fill="rgba(255,255,255,.5)"/>
-    <rect x="56" y="-68" width="14" height="50" rx="5" fill="rgba(255,255,255,.6)"/>
+    <path d="M-18,-24 L-38,-28 M-18,-22 L-38,-22 M-18,-20 L-38,-18" stroke="rgba(255,255,255,.45)" stroke-width="2" stroke-linecap="round"/>
+    <path d="M14,-24 L34,-28 M14,-22 L34,-22 M14,-20 L34,-18" stroke="rgba(255,255,255,.45)" stroke-width="2" stroke-linecap="round"/>
+    <!-- 哑铃杆（被右手推起，在猫头顶斜上方） -->
+    <g transform="translate(-4,-90) rotate(-18)">
+      <rect x="-42" y="-8" width="84" height="14" rx="7" fill="rgba(255,255,255,.9)" filter="drop-shadow(0 2px 4px rgba(0,0,0,.1))"/>
+      <rect x="-36" y="-18" width="12" height="34" rx="5" fill="rgba(255,255,255,.45)"/>
+      <rect x="24" y="-18" width="12" height="34" rx="5" fill="rgba(255,255,255,.45)"/>
+      <rect x="-32" y="-14" width="8" height="26" rx="4" fill="rgba(255,255,255,.55)"/>
+      <rect x="24" y="-14" width="8" height="26" rx="4" fill="rgba(255,255,255,.55)"/>
+    </g>
   </g>
 </svg>

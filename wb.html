@@ -2516,6 +2516,10 @@ function renderStats(){
         });
       }
     });
+    // 加力量训练（customEx）热量
+    Object.keys(data.customEx||{}).forEach(k=>{
+      if(k.startsWith(mk))(data.customEx[k]||[]).forEach(e=>{ if(e.done!==false)totalCal+=(e.cal||0); });
+    });
     Object.keys(data.diet).forEach(k=>{
       if(k.startsWith(mk)){
         if(data.diet[k]==='low')lowDays++;

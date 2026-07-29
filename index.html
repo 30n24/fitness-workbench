@@ -458,6 +458,26 @@ html.dark input,html.dark textarea,html.dark select{color:var(--text)}
 .water-card .wcount{font-size:12px;color:var(--muted);margin-top:4px}
 .water-card .wadd{width:42px;height:42px;border-radius:12px;background:var(--accent);color:#fff;font-size:20px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:.18s}
 .water-card .wadd:active{transform:scale(.92)}
+.water-card .whint{font-size:11px;color:var(--accent);margin-top:5px;line-height:1.4;display:none}
+/* 无记录 → 脉冲提示 */
+.water-card.remind{border-color:var(--accent);animation:waterPulse 1.6s ease-in-out infinite}
+.water-card.remind .wicon{animation:waterBob 1.6s ease-in-out infinite}
+@keyframes waterPulse{0%,100%{box-shadow:0 0 0 0 rgba(34,211,238,.0)}50%{box-shadow:0 0 0 6px rgba(34,211,238,.18)}}
+@keyframes waterBob{0%,100%{transform:translateY(0)}50%{transform:translateY(-4px)}}
+/* 饮水达标庆祝 */
+.water-overlay{position:fixed;inset:0;background:rgba(10,15,25,.55);display:flex;align-items:center;justify-content:center;z-index:200;opacity:0;transition:.25s;padding:20px}
+.water-overlay.show{opacity:1}
+.water-cheer{background:var(--card);border:1px solid rgba(34,211,238,.4);border-radius:20px;padding:24px 22px;max-width:330px;width:100%;text-align:center;transform:scale(.9);transition:.25s;box-shadow:0 18px 50px rgba(0,0,0,.3)}
+.water-overlay.show .water-cheer{transform:scale(1)}
+.water-cheer .wc-drop{font-size:54px;animation:dropBounce 1.2s ease-in-out infinite}
+.water-cheer .wc-title{font-size:20px;font-weight:800;margin-top:6px;color:var(--text)}
+.water-cheer .wc-sub{font-size:13px;color:var(--muted);margin-top:6px;line-height:1.5}
+.water-cheer .wc-benefits{margin:16px 0 6px;text-align:left;display:flex;flex-direction:column;gap:8px}
+.water-cheer .wc-benefits div{font-size:13px;color:var(--text);background:var(--bg-2);border-radius:10px;padding:9px 12px;line-height:1.4}
+.water-cheer .wc-actions{margin-top:14px}
+.water-cheer .wc-close{padding:11px 22px;border:none;border-radius:12px;background:var(--accent);color:#fff;font-size:14px;font-weight:700;cursor:pointer}
+.water-cheer .wc-close:active{transform:scale(.96)}
+@keyframes dropBounce{0%,100%{transform:translateY(0) scale(1)}30%{transform:translateY(-10px) scale(1.08)}60%{transform:translateY(0) scale(1)}}
 .water-card .wreset{font-size:11px;color:var(--muted);margin-left:6px;cursor:pointer}
 
 /* ===== 身体数据页 ===== */
@@ -848,6 +868,7 @@ html.dark .dash-card{background:#171f30}
       <div class="wt">今日饮水</div>
       <div class="wbar"><div class="wfill" id="waterFill"></div></div>
       <div class="wcount" id="waterCount">0 / 8 杯 <span class="wreset" id="waterReset">重置</span></div>
+      <div class="whint" id="waterHint"></div>
     </div>
     <div class="wadd" id="waterAdd">+1</div>
   </div>
@@ -3290,11 +3311,47 @@ function renderWater(){
   const n=profile().water?.[k]||0;
   const fill=document.getElementById('waterFill');
   const count=document.getElementById('waterCount');
+  const card=document.getElementById('waterCard');
+  const hint=document.getElementById('waterHint');
   if(fill)fill.style.width=Math.min(100,Math.round(n/WATER_GOAL*100))+'%';
   if(count&&count.firstChild)count.firstChild.nodeValue=n+' / '+WATER_GOAL+' 杯 ';
+  // 无记录 → 提示喝水；达标 → 鼓励提示
+  if(card)card.classList.toggle('remind', n===0);
+  if(hint){
+    if(n===0){hint.style.display='block';hint.textContent='💧 今日仲未饮水，点 +1 开始补水，保持身体水润～';}
+    else if(n<WATER_GOAL){hint.style.display='none';}
+    else{hint.style.display='block';hint.textContent='🎉 已达标 '+n+'/'+WATER_GOAL+' 杯，继续维持！';}
+  }
 }
-function drinkWater(){const k=recKey();if(!profile().water)profile().water={};profile().water[k]=(profile().water[k]||0)+1;save();renderWater();}
+function drinkWater(){
+  const k=recKey();
+  if(!profile().water)profile().water={};
+  const before=profile().water[k]||0;
+  const after=before+1;
+  profile().water[k]=after;
+  save();renderWater();
+  if(after===WATER_GOAL)showWaterCheer(after); // 饮够每日目标 → 弹动画鼓励
+}
 function resetWater(){const k=recKey();if(!profile().water)profile().water={};profile().water[k]=0;save();renderWater();}
+function showWaterCheer(n){
+  const ov=document.createElement('div');ov.className='water-overlay';
+  ov.innerHTML=`<div class="water-cheer ${curProfile==='A'?'pA':'pB'}">
+    <div class="wc-drop">💧</div>
+    <div class="wc-title">今日饮水达标！</div>
+    <div class="wc-sub">你已经饮咗 ${n} 杯，身体正悄悄变好 💪</div>
+    <div class="wc-benefits">
+      <div>💦 促进代谢，帮手减脂</div>
+      <div>✨ 皮肤更水润有光泽</div>
+      <div>🧠 提升专注同训练状态</div>
+      <div>🦴 维持关节润滑同体温</div>
+      <div>🚽 帮身体排走代谢废物</div>
+    </div>
+    <div class="wc-actions"><button class="wc-close">好嘅，继续加油</button></div>
+  </div>`;
+  document.body.appendChild(ov);
+  ov.querySelector('.wc-close').onclick=()=>ov.remove();
+  setTimeout(()=>ov.classList.add('show'),10);
+}
 
 /* 自定义食物 */
 function renderCustomFood(){

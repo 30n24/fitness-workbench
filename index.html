@@ -634,6 +634,21 @@ html.dark .dash-card{background:#171f30}
 /* ===== AI 联网查设置 ===== */
 .meal-ai-btn{display:none;padding:0 10px;height:40px;border-radius:12px;border:1px solid var(--border);background:linear-gradient(135deg,var(--purple),var(--primary));color:#fff;font-size:12px;font-weight:700;white-space:nowrap}
 .meal-ai-btn:active{transform:scale(.95)}
+/* ===== 自定义动作 + AI 计卡 ===== */
+.custom-ex-card{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:14px;margin:14px 2px 0}
+.custom-ex-card .meal-row{display:flex;gap:8px;align-items:center}
+.custom-ex-card .meal-row input{flex:1;min-width:0}
+.custom-ex-list{margin-top:10px;display:flex;flex-direction:column;gap:8px}
+.ce-empty{font-size:12px;color:var(--muted);text-align:center;padding:8px 0}
+.ce-item{display:flex;align-items:center;justify-content:space-between;gap:8px;background:linear-gradient(135deg,rgba(91,140,255,.08),rgba(244,114,182,.06));border:1px solid var(--border);border-radius:12px;padding:8px 10px}
+.ce-item.on{border-color:var(--primary)}
+.ce-main{display:flex;flex-direction:column;gap:2px;min-width:0}
+.ce-name{font-size:14px;font-weight:700}
+.ce-meta{font-size:11px;color:var(--muted)}
+.ce-side{display:flex;align-items:center;gap:10px;flex-shrink:0}
+.ce-cal{font-size:12px;font-weight:700;color:var(--pink,#ec4899)}
+.ce-del{font-size:14px;color:var(--muted);cursor:pointer;padding:2px 4px}
+.ce-note{font-size:11px;color:var(--muted);margin-top:2px}
 .ai-modal{position:fixed;inset:0;z-index:9993;background:rgba(0,0,0,.5);display:none;align-items:center;justify-content:center;padding:18px;animation:fadeIn .15s ease}
 .ai-modal.show{display:flex}
 .ai-box{background:var(--card);border-radius:18px;max-width:420px;width:100%;padding:18px 18px calc(18px + env(safe-area-inset-bottom));box-shadow:0 16px 50px rgba(0,0,0,.3);max-height:88vh;overflow:auto}
@@ -799,6 +814,21 @@ html.dark .dash-card{background:#171f30}
   </div>
   <div class="ex-search"><input id="exSearch" type="search" inputmode="search" placeholder="🔍 搜动作 / 部位，如：卧推、胸"></div>
   <div id="exerciseList"></div>
+  <div class="custom-ex-card">
+    <div class="section-title">➕ 自定义动作 <span class="hint">库里冇嘅动作，用 AI 计卡</span></div>
+    <div class="meal-row">
+      <input type="text" id="exInput" placeholder="动作＋组数次数重量，如：保加利亚分腿蹲 4组x10次x20kg" list="exList">
+      <button class="meal-add-btn" id="exAdd">添加</button>
+      <button class="meal-ai-btn" id="exAi">🔍AI</button>
+    </div>
+    <div class="custom-ex-list" id="customExList"></div>
+    <datalist id="exList">
+      <option value="保加利亚分腿蹲"></option><option value="壶铃摇摆"></option><option value="农夫行走"></option>
+      <option value="臀推"></option><option value="腿举"></option><option value="肩推"></option>
+      <option value="二头弯举"></option><option value="三头下压"></option><option value="平板支撑"></option>
+      <option value="俄罗斯转体"></option><option value="悬垂举腿"></option><option value="引体向上"></option>
+    </datalist>
+  </div>
   <button class="checkin-btn" id="checkinBtn">完成今日打卡</button>
 
   <div class="section-title" style="margin-top:20px">🏃 有氧运动</div>
@@ -1527,7 +1557,7 @@ function recKey(){const d=curRecDate;return `${d.getFullYear()}-${String(d.getMo
 function isRecToday(){return recKey()===todayKey();}
 function recDayLabel(){const wk=['日','一','二','三','四','五','六'];const d=curRecDate;return isRecToday()?'今日':(d.getMonth()+1)+'月'+d.getDate()+'日 周'+wk[d.getDay()];}
 // 切换记录日期后刷新相关视图（训练/饮食/有氧/饮水/羽毛球）
-function applyRecDate(){updateRecDateBar();renderTopbar();renderParts();renderExercises();renderBadminton();renderCardio();renderCalorieSummary();renderWater();if(curPage==='diet')renderDiet();}
+function applyRecDate(){updateRecDateBar();renderTopbar();renderParts();renderExercises();renderBadminton();renderCardio();renderCalorieSummary();renderCustomEx();renderWater();if(curPage==='diet')renderDiet();}
 function shiftRecDate(n){curRecDate.setDate(curRecDate.getDate()+n);applyRecDate();}
 function resetRecDate(){curRecDate=new Date();applyRecDate();}
 function setRecDate(y,m,d){curRecDate=new Date(y,m-1,d);applyRecDate();}
@@ -2981,6 +3011,7 @@ function renderCalorieSummary(){
   let exCal=0;
   (profile().cardio?.[k]||[]).forEach(c=>exCal+=cardioCalOf(c));
   const bd=profile().badminton?.[k];if(bd)exCal+=bd.duration*7;
+  (profile().customEx?.[k]||[]).forEach(e=>{ if(e.done!==false) exCal+=(e.cal||0); });
   const calBar=document.getElementById('calBar'),calTotal=document.getElementById('calTotal'),calDetail=document.getElementById('calDetail');
   if(calBar){
     if(foodCal+exCal>0){calBar.style.display='block';calTotal.textContent=(foodCal+exCal)+'kcal';calDetail.innerHTML=`饮食 ${foodCal} · 运动消耗 ${exCal}kcal`;}
@@ -3494,7 +3525,7 @@ function openAiCfg(){
 }
 function updateAiButtons(){
   const has=!!getAICfg();
-  ['breakfast','lunch','dinner'].forEach(k=>{const b=document.getElementById(k+'Ai');if(b)b.style.display=has?'inline-block':'none';});
+  ['breakfast','lunch','dinner','ex'].forEach(k=>{const b=document.getElementById(k+'Ai');if(b)b.style.display=has?'inline-block':'none';});
 }
 async function aiLookupFood(raw,kind,inputId){
   const cfg=getAICfg();
@@ -3526,6 +3557,87 @@ async function aiLookupFood(raw,kind,inputId){
     showFoodHint('⚠️ AI 查询失败：'+e.message+'（检查 Key/网络；若提示跨域，可在「自定义」里填支持浏览器跨域的接口地址）');
   }
 }
+
+/* ===== 自定义动作 + AI 辅助计卡（类比食物记录） ===== */
+function parseExPerf(text){
+  let s=(''+text).replace(/，/g,',')
+  let weight=null;
+  const wm=s.match(/(\d+(?:\.\d+)?)\s*(?:kg|公斤|千克|磅|jin|斤)/i);
+  if(wm){weight=parseFloat(wm[1]); if(/磅/i.test(wm[0]))weight*=0.4536; s=s.replace(wm[0],' ');}
+  let sets=null,reps=null;
+  const chain=s.match(/(\d+)\s*[x×X*]\s*(\d+)\s*[x×X*]\s*(\d+)/);
+  if(chain){if(sets==null)sets=parseInt(chain[1]);reps=parseInt(chain[2]);if(weight==null)weight=parseFloat(chain[3]);}
+  const sm=s.match(/(\d+)\s*组/); if(sm&&sets==null)sets=parseInt(sm[1]);
+  const rm=s.match(/(\d+)\s*次/); if(rm&&reps==null)reps=parseInt(rm[1]);
+  let name=s.replace(/[\dx×X*组次kg公斤千克磅jin斤]+/gi,'').replace(/[，,。.、]/g,'').replace(/\s+/g,'').trim();
+  if(!name)name=(''+text).replace(/[\dx×X*]+/g,'').replace(/(组|次|kg|公斤|千克|磅)+/gi,'').replace(/\s+/g,'').trim()||(''+text).trim();
+  if(sets==null)sets=3; if(reps==null)reps=10;
+  return {name,sets,reps,weight};
+}
+function estExCal(sets,reps,weight){
+  const bw=latestWeight(curProfile)||60;
+  if(weight&&weight>0) return Math.round(sets*reps*(0.045*weight+0.03*bw));
+  return Math.round(sets*reps*0.045*bw);
+}
+function addCustomEx(name,sets,reps,weight,cal,note,ai){
+  if(!profile().customEx)profile().customEx={};
+  const k=recKey(); if(!profile().customEx[k])profile().customEx[k]=[];
+  profile().customEx[k].push({name,sets,reps,weight:weight||0,cal:cal||estExCal(sets,reps,weight),note:note||'',ai:!!ai,done:true});
+  save();renderCustomEx();renderCalorieSummary();if(curPage==='stats')renderStats();
+}
+function renderCustomEx(){
+  const el=document.getElementById('customExList'); if(!el)return;
+  const k=recKey(); const list=(profile().customEx?.[k]||[]);
+  if(!list.length){el.innerHTML='<div class="ce-empty">库里冇嘅动作，打上面＋AI 自动计卡 💡</div>';return;}
+  el.innerHTML='';
+  list.forEach((e,i)=>{
+    const div=document.createElement('div');div.className='ce-item'+(e.done?' on':'');
+    div.innerHTML='<div class="ce-main"><span class="ce-name">'+e.name+'</span>'+
+      '<span class="ce-meta">'+(e.sets||'?')+'组·'+(e.reps||'?')+'次'+(e.weight?('·'+e.weight+'kg'):'（自重）')+'</span></div>'+
+      '<div class="ce-side"><span class="ce-cal">🔥'+(e.cal||0)+'kcal</span><span class="ce-del" data-i="'+i+'">✕</span></div>'+
+      (e.note?'<div class="ce-note">'+e.note+'</div>':'');
+    el.appendChild(div);
+    div.querySelector('.ce-del').onclick=()=>{profile().customEx[k].splice(i,1);save();renderCustomEx();renderCalorieSummary();if(curPage==='stats')renderStats();};
+  });
+}
+async function aiLookupExercise(raw,inputId){
+  const cfg=getAICfg();
+  if(!cfg||!cfg.key){showFoodHint('未配置 AI：去「数据管理 → 🤖 AI 查热量」填写 Key');openAiCfg();return;}
+  showFoodHint('🔍 正在用 AI 估算「'+raw+'」消耗…');
+  const bw=latestWeight(curProfile)||60;
+  try{
+    const sys='你是专业健身教练。用户做咗一个抗阻/自重训练动作，会俾你动作名同佢嘅表现（组数、次数、负重）。请按佢体重 '+bw+'kg 估算呢次训练总消耗热量(千卡)。只输出 JSON：{"cal":数字,"sets":数字,"reps":数字,"weight":数字或0,"note":"简短中文说明"}，唔好有任何多余文字。若用户冇讲负重，weight 填 0（当作自重动作）。';
+    const body={model:cfg.model||'deepseek-chat',messages:[{role:'system',content:sys},{role:'user',content:raw}],temperature:0.2,response_format:{type:'json_object'}};
+    const resp=await fetch(cfg.base.replace(/\/+$/,'')+'/chat/completions',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+cfg.key},body:JSON.stringify(body)});
+    if(!resp.ok){const t=await resp.text().catch(()=>'');throw new Error('HTTP '+resp.status+(t?(' '+t.slice(0,80)):''));}
+    const j=await resp.json();
+    const content=j.choices&&j.choices[0]&&j.choices[0].message?j.choices[0].message.content:'';
+    const mm=content.match(/\{[\s\S]*\}/);
+    const o=mm?JSON.parse(mm[0]):null;
+    if(!o||typeof o.cal!=='number')throw new Error('AI 返回格式异常');
+    const p=parseExPerf(raw);
+    const name=p.name||raw.trim();
+    const sets=o.sets||p.sets, reps=o.reps||p.reps, weight=(o.weight||p.weight||0);
+    const cal=Math.round(o.cal);
+    addCustomEx(name,sets,reps,weight,cal,o.note,'ai');
+    const inp=document.getElementById(inputId);if(inp)inp.value='';
+    showFoodHint('✅ AI：'+name+' ≈ '+cal+'kcal（'+sets+'组×'+reps+'次'+(weight?('·'+weight+'kg'):'')+'）已记录');
+  }catch(e){
+    showFoodHint('⚠️ AI 查询失败：'+e.message+'（检查 Key/网络；或先填组数次数重量，撳「添加」用本地估算）');
+  }
+}
+document.getElementById('exAdd').onclick=()=>{
+  const raw=document.getElementById('exInput').value.trim(); if(!raw)return;
+  const p=parseExPerf(raw);
+  addCustomEx(p.name,p.sets,p.reps,p.weight,null,null,false);
+  const cal=estExCal(p.sets,p.reps,p.weight);
+  document.getElementById('exInput').value='';
+  showFoodHint('➕ 已记录「'+p.name+'」≈ '+cal+'kcal（本地估算；填 Key 撳🔍AI 更准）');
+};
+document.getElementById('exAi').onclick=()=>{
+  const raw=document.getElementById('exInput').value.trim(); if(!raw){showFoodHint('先输入动作＋组数次数重量');return;}
+  aiLookupExercise(raw,'exInput');
+};
 
 /* 拍照事件 */
 document.getElementById('photoTakeBtn').onclick=()=>document.getElementById('photoInput').click();

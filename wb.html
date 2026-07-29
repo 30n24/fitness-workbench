@@ -2561,7 +2561,7 @@ function computeBadges(prof){
   const bw=Object.keys(data.body||{}).filter(k=>data.body[k]&&data.body[k].weight).sort();
   if(bw.length>=2){const f=data.body[bw[0]].weight,l=data.body[bw[bw.length-1]].weight;if(f-l>=1)earned.add('loss');}
   const mk=monthKey();let cd=0;Object.keys(data.checkins).forEach(k=>{if(k.startsWith(mk)&&data.checkins[k].partChecked)cd++;});
-  const daysInMonth=new Date().getDate();
+  const daysInMonth=new Date(new Date().getFullYear(),new Date().getMonth()+1,0).getDate();
   if(daysInMonth&&cd/daysInMonth>=0.8)earned.add('month80');
   return earned;
 }
@@ -3127,7 +3127,7 @@ function generateReport(){
   let checkinDays=0,partDays={};
   Object.keys(data.checkins).forEach(k=>{if(k.startsWith(mk)&&data.checkins[k].partChecked){checkinDays++;const p=data.checkins[k].part;if(p)partDays[p]=(partDays[p]||0)+1;}});
   let totalCal=0;
-  Object.keys(data.cardio||{}).forEach(k=>{if(k.startsWith(mk))(data.cardio[k]||[]).forEach(c=>totalCal+=(c.duration||0)*8);});
+  Object.keys(data.cardio||{}).forEach(k=>{if(k.startsWith(mk))(data.cardio[k]||[]).forEach(c=>{totalCal+=c.cal!=null?c.cal:Math.round((c.duration||0)*((CARDIO[c.type]&&CARDIO[c.type].cpm)||8));});});
   Object.keys(data.badminton||{}).forEach(k=>{if(k.startsWith(mk))totalCal+=(data.badminton[k].duration||0)*7;});
   const bkeys=Object.keys(data.body||{}).sort();
   const bw0=bkeys.length?data.body[bkeys[0]].weight:null;

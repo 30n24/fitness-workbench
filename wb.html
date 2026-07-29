@@ -944,7 +944,7 @@ html.dark .dash-card{background:#171f30}
     <div class="ex-lib-list" id="exLibList"></div>
   </div>
   <button class="checkin-btn" id="checkinBtn">完成今日打卡</button>
-  <button class="rest-btn" id="restBtn">🛌 今日休息</button>
+  <button class="rest-btn" id="restBtn"></button>
 
   <div class="section-title" style="margin-top:20px">🏃 有氧运动</div>
   <div class="cardio-card">
@@ -1703,6 +1703,18 @@ function updateRecDateBar(){
   const tb=document.getElementById('rdToday'); if(tb)tb.style.display=isRecToday()?'none':'';
   const inp=document.getElementById('rdInput'); if(inp)inp.value=recKey();
   const chip=document.getElementById('dateChip'); if(chip)chip.textContent=(d.getMonth()+1)+'月'+d.getDate()+'日 周'+wk[d.getDay()];
+  // 休息按钮文案：今日→休息，过往无记录→补存，有训练→隐藏
+  const rb=document.getElementById('restBtn');
+  if(rb){
+    if(isRecToday()){ rb.textContent='🛌 今日休息'; rb.style.display=''; }
+    else {
+      const ci=profile().checkins[recKey()];
+      const hasTrain=(profile().customEx?.[recKey()]||[]).length>0||(profile().cardio?.[recKey()]||[]).length>0;
+      if(hasTrain||(ci&&ci.partChecked&&!ci.rest)){ rb.style.display='none'; }
+      else if(ci&&ci.rest){ rb.textContent='😴 已休息（点此取消）'; rb.style.display=''; }
+      else { rb.textContent='📝 补存休息'; rb.style.display=''; }
+    }
+  }
 }
 function monthKey(){const d=new Date();return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`}
 function load(){try{const s=JSON.parse(localStorage.getItem(KEY)||'{}');if(!s.A)s.A={checkins:{},notes:{},diet:{},badminton:{},cardio:{},breakfast:{},lunch:{},dinner:{},eatOut:{},expenses:{},foods:[],body:{},water:{},name:''};if(!s.B)s.B={checkins:{},notes:{},diet:{},badminton:{},cardio:{},breakfast:{},lunch:{},dinner:{},eatOut:{},expenses:{},foods:[],body:{},water:{},name:''};['A','B'].forEach(p=>{['breakfast','lunch','dinner','eatOut','expenses'].forEach(k=>{if(!s[p][k])s[p][k]={}});if(!s[p].cardio)s[p].cardio={}});if(!s._sync)s._sync={A:0,B:0};return s}catch(e){return{A:{checkins:{},notes:{},diet:{},badminton:{},cardio:{},breakfast:{},lunch:{},dinner:{},eatOut:{},expenses:{},foods:[],body:{},water:{},name:''},B:{checkins:{},notes:{},diet:{},badminton:{},cardio:{},breakfast:{},lunch:{},dinner:{},eatOut:{},expenses:{},foods:[],body:{},water:{},name:''},_sync:{A:0,B:0}}}}
@@ -2732,9 +2744,16 @@ function renderCheckinBtn(){
   const done=!!(ck&&ck.partChecked&&!rest);
   btn.classList.toggle('done',done||rest);
   btn.classList.toggle('rest',rest);
-  if(rest)btn.textContent='🛌 今日休息中（点此改为训练）';
-  else if(done)btn.textContent='✓ 今日已打卡（点此取消）';
-  else btn.textContent='完成今日打卡';
+  const lb=recDayLabel();
+  if(isRecToday()){
+    if(rest)btn.textContent='🛌 今日休息中（点此改为训练）';
+    else if(done)btn.textContent='✓ 今日已打卡（点此取消）';
+    else btn.textContent='完成今日打卡';
+  } else {
+    if(rest)btn.textContent='🛌 '+lb+'休息中（点此取消）';
+    else if(done)btn.textContent='✓ '+lb+'已打卡（点此取消）';
+    else btn.textContent='📝 补登记打卡';
+  }
   btn.classList.remove('pA','pB');btn.classList.add(curProfile==='A'?'pA':'pB');
 }
 function doCheckin(){
@@ -4061,7 +4080,7 @@ function parseExPerf(text){
 function estExCal(sets,reps,weight,name){
   const bw=latestWeight(curProfile)||60;
   const cn=(name||'').toLowerCase();
-  const compound=/卧推|深蹲|硬拉|划船|推举|引体|飞鸟|双杠|俯卧撑|squat|deadlift|bench|pull|row|press|pushup|dip/.test(cn);
+  const compound=/卧推|深蹲|硬拉|划船|推举|引体|飞鸟|双杠|俯卧撑|推胸|squat|deadlift|bench|pull|row|press|pushup|dip/.test(cn);
   let met=5;
   if(!weight||weight<=0) met=3.5;
   else { const r=weight/bw; if(r<0.3) met=3.5; else if(r<0.7) met=5; else met=6; }
@@ -4073,7 +4092,7 @@ function estExCal(sets,reps,weight,name){
 function estExCalFromDetail(detail,name){
   const bw=latestWeight(curProfile)||60;
   const cn=(name||'').toLowerCase();
-  const compound=/卧推|深蹲|硬拉|划船|推举|引体|飞鸟|双杠|俯卧撑|squat|deadlift|bench|pull|row|press|pushup|dip/.test(cn);
+  const compound=/卧推|深蹲|硬拉|划船|推举|引体|飞鸟|双杠|俯卧撑|推胸|squat|deadlift|bench|pull|row|press|pushup|dip/.test(cn);
   let total=0;
   (detail||[]).forEach(d=>{
     const w=d.weight||0, reps=Math.max(d.reps||1,1);

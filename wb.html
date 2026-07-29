@@ -1811,6 +1811,17 @@ async function syncPull(){
   if(changed)saveLocal();
   return changed;
 }
+// 强制从云端全量拉取（忽略时间戳，优先云端）——用于「从云端恢复」与启动兜底
+async function forcePull(){
+  const {data}=await cloudGet();
+  ['A','B'].forEach(q=>{
+    SYNC_DATE_FIELDS.forEach(f=>{ const cloudF=(data[q]&&data[q][f])||{}; const localF=state[q][f]||{}; state[q][f]=mergeDateField(cloudF,localF,true); });
+    SYNC_SIMPLE_FIELDS.forEach(f=>{ if(data[q]&&data[q][f]!==undefined) state[q][f]=mergeSimple(state[q][f],data[q][f],true); });
+    state._sync[q]=Math.max(state._sync[q]||0,(data._sync&&data._sync[q])||0);
+  });
+  saveLocal();
+  return true;
+}
 async function doSync(pushProfile, notify){
   if(!cloudReady())return;
   if(location.search.includes('nosync'))return;
@@ -1959,12 +1970,17 @@ function enterApp(){
   updateRecDateBar();
   updateAiButtons();
   if(window.syncPartsTop)window.syncPartsTop();
-  // 进入后拉取对方最新数据
+  // 进入后强制拉取云端最新数据（兜底，确保显示）
   if(cloudReady()){
     setSyncStatus('syncing');
-    setTimeout(()=>{
-      showFoodHint('☁ 正在云端同步…请稍候');
-      doSync(null,true);
+    setTimeout(async()=>{
+      try{
+        showFoodHint('☁ 正在云端同步…请稍候');
+        await forcePull();
+        renderAll();
+        setSyncStatus('ok');
+        showFoodHint('☁ 已同步到云端最新数据');
+      }catch(e){ setSyncStatus('err'); }
     },800);
   }
 }
@@ -3832,15 +3848,15 @@ document.getElementById('cloudBackupBtn').onclick=async()=>{
     document.getElementById('dmHint').textContent='❌ 上传失败：'+e.message+'（检查网络/Token 权限）';
   }
 };
-// 从云端恢复（把云端数据拉到本机并合并）
+// 从云端恢复（强制全量拉取，忽略时间戳）
 document.getElementById('cloudRestoreBtn').onclick=async()=>{
   if(!cloudReady()){document.getElementById('dmHint').textContent='⚠️ 云端同步未启用，请先配置 token';return;}
   try{
     document.getElementById('dmHint').textContent='☁ 正在从云端恢复…';
-    const changed=await syncPull();
+    await forcePull();
     state=load();
     if(_inApp)renderAll();
-    document.getElementById('dmHint').textContent=changed?'✅ 已从云端恢复最新数据':'☁ 云端无更新（本机已是最新）';
+    document.getElementById('dmHint').textContent='✅ 已从云端恢复！返回重新进入计划即可看到（'+ (state.A.name||'A') +' / '+ (state.B.name||'B') +'）';
   }catch(e){
     document.getElementById('dmHint').textContent='❌ 恢复失败：'+e.message;
   }

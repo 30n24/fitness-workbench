@@ -871,7 +871,7 @@ html.dark .dash-card{background:#171f30}
     <div class="wmeta">
       <div class="wt">今日饮水</div>
       <div class="wbar"><div class="wfill" id="waterFill"></div></div>
-      <div class="wcount" id="waterCount">0 / 8 杯 <span class="wreset" id="waterReset">重置</span></div>
+      <div class="wcount" id="waterCount">0 / 2000ml <span class="wreset" id="waterReset">重置</span></div>
       <div class="whint" id="waterHint"></div>
     </div>
     <div class="wadd" id="waterAdd">+1</div>
@@ -3337,33 +3337,35 @@ function toggleTheme(){
   showFoodHint(next==='dark'?'已切换深色模式':'已切换浅色模式');
 }
 
-/* 饮水目标（科学公式：体重×性别系数×活动校正，转杯/250ml）
-   男 35ml/kg · 女 30ml/kg · 未知 33ml/kg；久坐1.2为基准，活动每高一档+15% */
+/* 饮水目标（科学公式：ml 为单位）
+   男 35ml/kg · 女 30ml/kg · 未知 33ml/kg；活动水平校正；+1=250ml */
 function waterGoal(){
   const w=latestWeight(curProfile);
-  if(w==null)return 8;
+  if(w==null)return 2000; // 无体重回退 2000ml
   const meta=state[curProfile].meta||{};
   const basePerKg = meta.sex==='female' ? 30 : (meta.sex==='male' ? 35 : 33);
   let ml = w * basePerKg;
   const act = meta.activity || 1.2;
   if(act>1.2) ml *= (1 + 0.15 * (act - 1.2));
-  return Math.max(4, Math.round(ml / 250));
+  return Math.max(1000, Math.round(ml / 50) * 50); // 四舍五入到 50ml
 }
 function renderWater(){
   const k=recKey();
-  const n=profile().water?.[k]||0;
+  const n=(profile().water?.[k]||0);   // n = 杯数（250ml/杯）
+  const cm=n*250;                       // 当前 ml
+  const gm=waterGoal();                 // 目标 ml
   const fill=document.getElementById('waterFill');
   const count=document.getElementById('waterCount');
   const card=document.getElementById('waterCard');
   const hint=document.getElementById('waterHint');
-  if(fill)fill.style.width=Math.min(100,Math.round(n/waterGoal()*100))+'%';
-  if(count&&count.firstChild)count.firstChild.nodeValue=n+' / '+waterGoal()+' 杯 ';
+  if(fill)fill.style.width=Math.min(100,Math.round(cm/gm*100))+'%';
+  if(count&&count.firstChild)count.firstChild.nodeValue=cm+' / '+gm+'ml';
   // 无记录 → 提示喝水；达标 → 鼓励提示
   if(card)card.classList.toggle('remind', n===0);
   if(hint){
-    if(n===0){hint.style.display='block';hint.textContent='💧 今日仲未饮水，点 +1 开始补水，保持身体水润～';}
-    else if(n<waterGoal()){hint.style.display='none';}
-    else{hint.style.display='block';hint.textContent='🎉 已达标 '+n+'/'+waterGoal()+' 杯，继续维持！';}
+    if(n===0){hint.style.display='block';hint.textContent='💧 今日仲未饮水（0/'+gm+'ml），点 +1 开始补水～';}
+    else if(cm<gm){hint.style.display='none';}
+    else{hint.style.display='block';hint.textContent='🎉 已达标 '+cm+'/'+gm+'ml，继续维持！';}
   }
 }
 function drinkWater(){
@@ -3373,15 +3375,16 @@ function drinkWater(){
   const after=before+1;
   profile().water[k]=after;
   save();renderWater();
-  if(after===waterGoal())showWaterCheer(after); // 饮够每日目标 → 弹动画鼓励
+  if(after*250>=waterGoal())showWaterCheer(after); // 饮够每日目标 → 弹动画鼓励
 }
 function resetWater(){const k=recKey();if(!profile().water)profile().water={};profile().water[k]=0;save();renderWater();}
 function showWaterCheer(n){
+  const gm=waterGoal();const cm=n*250;
   const ov=document.createElement('div');ov.className='water-overlay';
   ov.innerHTML=`<div class="water-cheer ${curProfile==='A'?'pA':'pB'}">
     <div class="wc-drop">💧</div>
     <div class="wc-title">今日饮水达标！</div>
-    <div class="wc-sub">你已经饮咗 ${n} 杯，身体正悄悄变好 💪</div>
+    <div class="wc-sub">你已经饮咗 ${cm}/${gm}ml，身体正悄悄变好 💪</div>
     <div class="wc-benefits">
       <div>💦 促进代谢，帮手减脂</div>
       <div>✨ 皮肤更水润有光泽</div>

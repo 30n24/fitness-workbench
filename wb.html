@@ -1880,6 +1880,13 @@ function initSelectPage(){
   document.getElementById('nameA').oninput=e=>{document.getElementById('nameA-display').textContent=e.target.value||'计划 A'};
   document.getElementById('nameB').oninput=e=>{document.getElementById('nameB-display').textContent=e.target.value||'计划 B'};
   renderHomeDash();
+  // 首页打开即强制拉取云端并显示概要（解决主屏首屏看不到数据）
+  if(cloudReady()){
+    setTimeout(async()=>{
+      try{ await forcePull(); renderHomeDash(); }
+      catch(e){}
+    },300);
+  }
 }
 
 function weekRange(){

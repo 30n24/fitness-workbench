@@ -1698,7 +1698,7 @@ function recKey(){const d=curRecDate;return `${d.getFullYear()}-${String(d.getMo
 function isRecToday(){return recKey()===todayKey();}
 function recDayLabel(){const wk=['日','一','二','三','四','五','六'];const d=curRecDate;return isRecToday()?'今日':(d.getMonth()+1)+'月'+d.getDate()+'日 周'+wk[d.getDay()];}
 // 切换记录日期后刷新相关视图（训练/饮食/有氧/饮水/羽毛球）
-function applyRecDate(){updateRecDateBar();renderTopbar();renderCheckinBtn();renderParts();renderExercises();renderBadminton();renderCardio();renderCalorieSummary();renderCustomEx();renderExLib();renderExParts();renderWater();if(curPage==='diet')renderDiet();}
+function applyRecDate(){updateRecDateBar();renderTopbar();renderCheckinBtn();renderParts();renderExercises();renderBadminton();renderCardio();renderCalorieSummary();renderCustomEx();renderExLib();renderExParts();renderWater();if(curPage==='diet')renderDiet();setTimeout(renderCheckinBtn,0);}
 function shiftRecDate(n){curRecDate.setDate(curRecDate.getDate()+n);applyRecDate();}
 function resetRecDate(){curRecDate=new Date();applyRecDate();}
 function setRecDate(y,m,d){curRecDate=new Date(y,m-1,d);applyRecDate();}

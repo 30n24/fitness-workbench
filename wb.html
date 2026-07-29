@@ -635,6 +635,14 @@ html.dark .dash-card{background:#171f30}
 .meal-ai-btn{display:none;padding:0 10px;height:40px;border-radius:12px;border:1px solid var(--border);background:linear-gradient(135deg,var(--purple),var(--primary));color:#fff;font-size:12px;font-weight:700;white-space:nowrap}
 .meal-ai-btn:active{transform:scale(.95)}
 .ai-tip{font-size:12px;color:var(--muted);background:linear-gradient(135deg,rgba(91,140,255,.08),rgba(244,114,182,.06));border:1px solid var(--border);border-radius:12px;padding:8px 10px;margin:6px 2px 0;line-height:1.6}
+/* 自由记录模式：隐藏固定按部位动作库列表（保留总热量条） */
+#partsBar,#trainInfo,.ex-search,#exerciseList{display:none!important}
+.ex-lib-card{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:14px;margin:14px 2px 0}
+.ex-lib-card .section-title{margin-bottom:2px}
+.ex-lib-list{margin-top:8px;display:flex;flex-wrap:wrap;gap:8px}
+.el-item{display:inline-flex;align-items:center;gap:4px;background:linear-gradient(135deg,rgba(91,140,255,.1),rgba(244,114,182,.07));border:1px solid var(--border);border-radius:20px;padding:6px 10px;font-size:13px;font-weight:600}
+.el-item .el-add{cursor:pointer;color:var(--primary);font-weight:800;font-size:17px;margin-left:2px;line-height:1}
+.el-empty{font-size:12px;color:var(--muted);text-align:center;padding:6px 0;width:100%}
 /* ===== 自定义动作 + AI 计卡 ===== */
 .custom-ex-card{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:14px;margin:14px 2px 0}
 .custom-ex-card .meal-row{display:flex;gap:8px;align-items:center}
@@ -775,7 +783,7 @@ html.dark .dash-card{background:#171f30}
 
 <!-- 训练页 -->
 <main class="page active" id="page-train">
-  <div class="section-title">今日训练部位 <span class="hint">60–90 分钟</span></div>
+  <div class="section-title">今日练咗咩 <span class="hint">打动作＋组数次数重量，或点 🔍AI</span></div>
   <div class="parts" id="partsBar"></div>
 
   <div class="water-card" id="waterCard">
@@ -829,6 +837,10 @@ html.dark .dash-card{background:#171f30}
       <option value="二头弯举"></option><option value="三头下压"></option><option value="平板支撑"></option>
       <option value="俄罗斯转体"></option><option value="悬垂举腿"></option><option value="引体向上"></option>
     </datalist>
+  </div>
+  <div class="ex-lib-card">
+    <div class="section-title">📚 我的动作库 <span class="hint">点选即可记录今日</span></div>
+    <div class="ex-lib-list" id="exLibList"></div>
   </div>
   <button class="checkin-btn" id="checkinBtn">完成今日打卡</button>
 
@@ -1559,7 +1571,7 @@ function recKey(){const d=curRecDate;return `${d.getFullYear()}-${String(d.getMo
 function isRecToday(){return recKey()===todayKey();}
 function recDayLabel(){const wk=['日','一','二','三','四','五','六'];const d=curRecDate;return isRecToday()?'今日':(d.getMonth()+1)+'月'+d.getDate()+'日 周'+wk[d.getDay()];}
 // 切换记录日期后刷新相关视图（训练/饮食/有氧/饮水/羽毛球）
-function applyRecDate(){updateRecDateBar();renderTopbar();renderParts();renderExercises();renderBadminton();renderCardio();renderCalorieSummary();renderCustomEx();renderWater();if(curPage==='diet')renderDiet();}
+function applyRecDate(){updateRecDateBar();renderTopbar();renderParts();renderExercises();renderBadminton();renderCardio();renderCalorieSummary();renderCustomEx();renderExLib();renderWater();if(curPage==='diet')renderDiet();}
 function shiftRecDate(n){curRecDate.setDate(curRecDate.getDate()+n);applyRecDate();}
 function resetRecDate(){curRecDate=new Date();applyRecDate();}
 function setRecDate(y,m,d){curRecDate=new Date(y,m-1,d);applyRecDate();}
@@ -1990,6 +2002,8 @@ function updateExCalBar(totalCal,doneCal,n){
 const EX_VT=8; // 动作数超过此阈值启用虚拟滚动（仅渲染屏幕内动作）
 const EX_MAIN_COUNT=5; // 每个部位默认显示5个主要动作，其余折叠
 function renderExercises(){
+  const exListEl=document.getElementById('exerciseList');
+  if(!exListEl||getComputedStyle(exListEl).display==='none')return; // 自由记录模式：固定库已隐藏，跳过渲染
   const info=partsList().find(p=>p.key===curPart);
   document.getElementById('trainIcon').textContent=info.emoji;
   document.getElementById('trainTitle').textContent=info.name+'训练';
@@ -3585,7 +3599,28 @@ function addCustomEx(name,sets,reps,weight,cal,note,ai){
   if(!profile().customEx)profile().customEx={};
   const k=recKey(); if(!profile().customEx[k])profile().customEx[k]=[];
   profile().customEx[k].push({name,sets,reps,weight:weight||0,cal:cal||estExCal(sets,reps,weight),note:note||'',ai:!!ai,done:true});
-  save();renderCustomEx();renderCalorieSummary();if(curPage==='stats')renderStats();
+  // 写入「我的动作库」（历史，去重，更新上次表现）
+  if(!profile().exLib)profile().exLib=[];
+  const lib=profile().exLib.find(x=>x.name===name);
+  if(lib){lib.sets=sets;lib.reps=reps;lib.weight=weight||0;lib.cal=cal||lib.cal;}
+  else profile().exLib.push({name,sets,reps,weight:weight||0,cal:cal||estExCal(sets,reps,weight)});
+  save();renderCustomEx();renderExLib();renderCalorieSummary();if(curPage==='stats')renderStats();
+}
+function renderExLib(){
+  const el=document.getElementById('exLibList'); if(!el)return;
+  const lib=profile().exLib||[];
+  if(!lib.length){el.innerHTML='<div class="el-empty">仲未记录过动作。喺上面打「动作＋组数次数重量」记录一次就会出现喺呢度 💡</div>';return;}
+  el.innerHTML='';
+  lib.forEach(e=>{
+    const item=document.createElement('div');item.className='el-item';
+    item.innerHTML='<span>'+e.name+'</span><span class="el-add" title="记录今日">＋</span>';
+    item.querySelector('.el-add').onclick=()=>{
+      const perf=e.name+' '+(e.sets||3)+'组x'+(e.reps||10)+'次'+(e.weight?('x'+e.weight+'kg'):'');
+      const inp=document.getElementById('exInput');inp.value=perf;inp.focus();
+      showFoodHint('已填入「'+perf+'」，确认或改完撳「添加」（或 🔍AI 更准）');
+    };
+    el.appendChild(item);
+  });
 }
 function renderCustomEx(){
   const el=document.getElementById('customExList'); if(!el)return;

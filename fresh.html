@@ -1678,7 +1678,7 @@ const MENUS = {
 const KEY='fitness_workbench_v2';
 let state=load();
 // 强制缓存更新：版本变化时清除所有 sw 缓存并硬刷新
-const APP_VER='16';
+const APP_VER='18';
 if(localStorage.getItem('app_ver')!==APP_VER){
   localStorage.setItem('app_ver',APP_VER);
   if('caches' in window)caches.keys().then(n=>{n.forEach(c=>{if(c.includes('fitness-workbench'))caches.delete(c);});}).then(()=>location.reload(true));
@@ -1878,21 +1878,20 @@ function setSyncStatus(s){
 /* ===== 选人页 ===== */
 // 清理虚假打卡：过往日期只有已打卡标记但无任何训练记录/cardio，视为数据污染
 function cleanupStaleCheckins(){
+  const today=todayKey();
   ['A','B'].forEach(p=>{
     const cks=state[p]?.checkins; if(!cks)return;
-    const today=todayKey();
-    Object.keys(cks).forEach(k=>{
-      if(k===today)return;
+    Object.keys(cks).filter(k=>k!==today).forEach(k=>{
       const c=cks[k]; if(!c)return;
       const hasEx=state[p].customEx?.[k]?.length>0;
       const hasCardio=state[p].cardio?.[k]?.length>0;
-      const hasTraining=hasEx||hasCardio||Object.keys(c.exercises||{}).length>0;
-      // 只有打卡标记但冇训练记录 → 虚假打卡删除
-      if(c.partChecked&&!c.rest&&!hasTraining){ delete cks[k]; return; }
-      // 有休息标记但同时有训练记录 → 数据矛盾（以训练为准），清除休息
-      if(c.rest&&hasTraining){ c.rest=false; c.partChecked=true; c.part=c.part||null; }
-      // 有休息标记但冇任何记录 → 系老bug污染，删除
-      if(c.rest&&!hasTraining){ delete cks[k]; }
+      if(hasEx||hasCardio||Object.keys(c.exercises||{}).length>0){
+        // 有训练记录：强制确保不是休息
+        if(c.rest){ c.rest=false; c.partChecked=true; }
+      } else {
+        // 冇任何训练记录：删除整个 checkin（不管打卡还是休息）
+        delete cks[k];
+      }
     });
   });
   saveLocal();
@@ -2776,7 +2775,10 @@ function renderCheckinBtn(){
     else if(done)btn.textContent='✓ 今日已打卡（点此取消）';
     else btn.textContent='完成今日打卡';
   } else {
-    if(rest)btn.textContent='🛌 '+lb+'休息中（点此取消）';
+    // 过往日期：即使数据库有 rest，但冇训练记录视为数据污染，显示补登记
+    const hasRealTrain=(profile().customEx?.[recKey()]||[]).length>0||(profile().cardio?.[recKey()]||[]).length>0;
+    if(rest&&!hasRealTrain){ btn.textContent='📝 补登记打卡'; }
+    else if(rest)btn.textContent='🛌 '+lb+'休息中（点此取消）';
     else if(done)btn.textContent='✓ '+lb+'已打卡（点此取消）';
     else btn.textContent='📝 补登记打卡';
   }

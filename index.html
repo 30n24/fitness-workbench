@@ -4056,15 +4056,35 @@ function parseExPerf(text){
   if(sets==null)sets=3; if(reps==null)reps=10;
   return {name,sets,reps,weight,detail};
 }
-function estExCal(sets,reps,weight){
+// 抗阻训练热量估算（MET 公式）：kcal = MET × 体重(kg) × 时间(h)
+// MET 按负重相对强度分级，大肌群复合动作加权，每组时间含动作+间歇
+function estExCal(sets,reps,weight,name){
   const bw=latestWeight(curProfile)||60;
-  if(weight&&weight>0) return Math.round(sets*reps*(0.045*weight+0.03*bw));
-  return Math.round(sets*reps*0.045*bw);
+  const cn=(name||'').toLowerCase();
+  const compound=/卧推|深蹲|硬拉|划船|推举|引体|飞鸟|双杠|俯卧撑|squat|deadlift|bench|pull|row|press|pushup|dip/.test(cn);
+  let met=5;
+  if(!weight||weight<=0) met=3.5;
+  else { const r=weight/bw; if(r<0.3) met=3.5; else if(r<0.7) met=5; else met=6; }
+  if(compound) met+=0.5;
+  const minPerSet=met>=6?2:1.5;
+  const min=sets*minPerSet;
+  return Math.round(met*bw*min/60);
 }
-function estExCalFromDetail(detail){
+function estExCalFromDetail(detail,name){
   const bw=latestWeight(curProfile)||60;
+  const cn=(name||'').toLowerCase();
+  const compound=/卧推|深蹲|硬拉|划船|推举|引体|飞鸟|双杠|俯卧撑|squat|deadlift|bench|pull|row|press|pushup|dip/.test(cn);
   let total=0;
-  (detail||[]).forEach(d=>{ const w=d.weight||0,r=d.reps||0; total += (w>0? (r*(0.045*w+0.03*bw)) : (r*0.045*bw)); });
+  (detail||[]).forEach(d=>{
+    const w=d.weight||0, reps=Math.max(d.reps||1,1);
+    let met=5;
+    if(!w) met=3.5;
+    else { const r=w/bw; if(r<0.3) met=3.5; else if(r<0.7) met=5; else met=6; }
+    if(compound) met+=0.5;
+    const baseMin=met>=6?2:1.5;
+    const min=baseMin*(reps/10);
+    total += met*bw*min/60;
+  });
   return Math.round(total);
 }
 function setKindTag(detail){
@@ -4128,7 +4148,7 @@ function renderExParts(){
 }
 function addCustomEx(name,sets,reps,weight,cal,note,ai,part,detail){
   const pk=part||classifyPart(name);
-  const calFinal = cal!=null?cal : (detail&&detail.length? estExCalFromDetail(detail) : estExCal(sets,reps,weight));
+  const calFinal = cal!=null?cal : (detail&&detail.length? estExCalFromDetail(detail,name) : estExCal(sets,reps,weight,name));
   if(!profile().customEx)profile().customEx={};
   const k=recKey(); if(!profile().customEx[k])profile().customEx[k]=[];
   profile().customEx[k].push({name,sets,reps,weight:weight||0,cal:calFinal,note:note||'',ai:!!ai,done:true,part:pk,detail:detail||null});
@@ -4217,23 +4237,23 @@ async function aiLookupExercise(raw,inputId){
   showFoodHint('🔍 正在用 AI 估算「'+raw+'」消耗…');
   const bw=latestWeight(curProfile)||60;
   try{
-    const sys='你是专业健身教练。用户做咗一个抗阻/自重训练动作，会俾你动作名同佢嘅表现（组数、次数、负重，可能夹带口语/描述）。请按佢体重 '+bw+'kg 估算呢次训练总消耗热量(千卡)。只输出 JSON：{"cal":数字,"sets":数字,"reps":数字,"weight":数字或0,"name":"动作规范中文名（去口语/去描述，例如用户讲『今天深蹲搞了』回『深蹲』、『练咗硬拉好攰』回『硬拉』）","part":"动作主要训练部位，只能是以下之一：肩部 / 背部 / 胸部 / 腹部 / 臀腿部（按主要刺激肌群判断；自重动作亦可归类）","note":"简短中文说明"}，唔好有任何多余文字。若用户冇讲负重，weight 填 0（当作自重动作）。';
+    const sys='你是专业健身教练。用户做咗一个抗阻/自重训练动作，会俾你动作名同佢嘅表现（组数、次数、负重，可能夹带口语/描述）。热量消耗由系统本地按 MET 公式计算，你唔使估。请只负责识别同规范化，输出 JSON：{"name":"动作规范中文名（去口语/去描述，例如用户讲『今天深蹲搞了』回『深蹲』、『练咗硬拉好攰』回『硬拉』）","part":"动作主要训练部位，只能是以下之一：肩部 / 背部 / 胸部 / 腹部 / 臀腿部（按主要刺激肌群判断；自重动作亦可归类）","sets":数字,"reps":数字,"weight":数字或0,"note":"简短中文说明（一句话讲呢个动作主要练边、点做）"}，唔好有任何多余文字，亦唔好输出 cal 字段。若用户冇讲负重，weight 填 0（当作自重动作）。';
     const body={model:cfg.model||'deepseek-chat',messages:[{role:'system',content:sys},{role:'user',content:raw}],temperature:0.2,response_format:{type:'json_object'}};
     const resp=await fetch(cfg.base.replace(/\/+$/,'')+'/chat/completions',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+cfg.key},body:JSON.stringify(body)});
     if(!resp.ok){const t=await resp.text().catch(()=>'');throw new Error('HTTP '+resp.status+(t?(' '+t.slice(0,80)):''));}
     const j=await resp.json();
     const content=j.choices&&j.choices[0]&&j.choices[0].message?j.choices[0].message.content:'';
-    const mm=content.match(/\{[\s\S]*\}/);
-    const o=mm?JSON.parse(mm[0]):null;
-    if(!o||typeof o.cal!=='number')throw new Error('AI 返回格式异常');
-    const p=parseExPerf(raw);
-    const name=(o.name&&(''+o.name).trim())||p.name||raw.trim();
-    const sets=o.sets||p.sets, reps=o.reps||p.reps, weight=(o.weight||p.weight||0);
-    const cal=Math.round(o.cal);
-    const part=partKeyFromName(o.part)||classifyPart(name);
-    addCustomEx(name,sets,reps,weight,cal,o.note,'ai',part,p.detail);
-    const inp=document.getElementById(inputId);if(inp)inp.value='';
-    showFoodHint('✅ AI：'+name+' ≈ '+cal+'kcal（'+sets+'组×'+reps+'次'+(weight?('·'+weight+'kg'):'')+'）已记录');
+const mm=content.match(/\{[\s\S]*\}/);
+const o=mm?JSON.parse(mm[0]):null;
+if(!o||!o.name)throw new Error('AI 返回格式异常');
+const p=parseExPerf(raw);
+const name=(''+o.name).trim()||p.name||raw.trim();
+const sets=o.sets||p.sets, reps=o.reps||p.reps, weight=(o.weight||p.weight||0);
+const cal=estExCal(sets,reps,weight,name);
+const part=partKeyFromName(o.part)||classifyPart(name);
+addCustomEx(name,sets,reps,weight,null,o.note,'ai',part,p.detail);
+const inp=document.getElementById(inputId);if(inp)inp.value='';
+showFoodHint('✅ AI：'+name+' ≈ '+cal+'kcal（MET 本地估算·'+sets+'组×'+reps+'次'+(weight?('·'+weight+'kg'):'')+'）已记录');
   }catch(e){
     showFoodHint('⚠️ '+fmtAIError(e)+'（或先填组数次数重量，撳「添加」用本地估算）');
   }
@@ -4242,7 +4262,7 @@ document.getElementById('exAdd').onclick=()=>{
   const raw=document.getElementById('exInput').value.trim(); if(!raw)return;
   const p=parseExPerf(raw);
   addCustomEx(p.name,p.sets,p.reps,p.weight,null,null,false,undefined,p.detail);
-  const cal=estExCal(p.sets,p.reps,p.weight);
+  const cal=estExCal(p.sets,p.reps,p.weight,p.name);
   document.getElementById('exInput').value='';
   showFoodHint('➕ 已记录「'+p.name+'」≈ '+cal+'kcal（本地估算；填 Key 撳🔍AI 更准）');
 };

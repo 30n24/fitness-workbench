@@ -3543,6 +3543,16 @@ function updateAiButtons(){
   // AI 按钮永远显示：冇 Key 嗰阵撳咗会引导去「数据管理 → 🤖 AI 查热量」填 Key
   ['breakfast','lunch','dinner','ex'].forEach(k=>{const b=document.getElementById(k+'Ai');if(b)b.style.display='inline-block';});
 }
+function fmtAIError(e){
+  const m=String(e&&e.message||'');
+  if(/HTTP\s*402/.test(m)&&/Balance|余额|balance/i.test(m)) return 'AI 余额不足，请到平台充值后再试 💰（DeepSeek: platform.deepseek.com）';
+  if(/HTTP\s*401/.test(m)) return 'API Key 无效或过期，去「数据管理 → 🤖 AI 查热量」检查 Key 🔑';
+  if(/HTTP\s*403/.test(m)) return '无权访问（Key 缺权限或地区受限）🚫';
+  if(/HTTP\s*429/.test(m)) return '请求太频繁/超限，稍后再试 ⏱';
+  if(/HTTP\s*5\d\d/.test(m)) return 'AI 服务暂时不可用，请稍后再试 🛠';
+  if(/Failed to fetch|NetworkError|TypeError.*fetch|CORS|跨域/i.test(m)) return '网络或跨域问题：默认 DeepSeek 允许浏览器跨域；OpenAI/自定义接口要保证对方支持 CORS 🌐';
+  return 'AI 查询失败：'+m.slice(0,120);
+}
 async function aiLookupFood(raw,kind,inputId){
   const cfg=getAICfg();
   if(!cfg||!cfg.key){showFoodHint('未配置 AI：去「数据管理 → 🤖 AI 查热量」填写 Key');openAiCfg();return;}
@@ -3571,7 +3581,7 @@ async function aiLookupFood(raw,kind,inputId){
     renderDietSummary();
     showFoodHint('✅ AI：'+food+' ≈ '+cal+'kcal / '+carb+'g碳（已存为自定义食物）');
   }catch(e){
-    showFoodHint('⚠️ AI 查询失败：'+e.message+'（检查 Key/网络；若提示跨域，可在「自定义」里填支持浏览器跨域的接口地址）');
+    showFoodHint('⚠️ '+fmtAIError(e));
   }
 }
 
@@ -3661,7 +3671,7 @@ async function aiLookupExercise(raw,inputId){
     const inp=document.getElementById(inputId);if(inp)inp.value='';
     showFoodHint('✅ AI：'+name+' ≈ '+cal+'kcal（'+sets+'组×'+reps+'次'+(weight?('·'+weight+'kg'):'')+'）已记录');
   }catch(e){
-    showFoodHint('⚠️ AI 查询失败：'+e.message+'（检查 Key/网络；或先填组数次数重量，撳「添加」用本地估算）');
+    showFoodHint('⚠️ '+fmtAIError(e)+'（或先填组数次数重量，撳「添加」用本地估算）');
   }
 }
 document.getElementById('exAdd').onclick=()=>{
@@ -3805,8 +3815,8 @@ document.getElementById('aiTest').onclick=async function(){
   try{
     const resp=await fetch(base.replace(/\/+$/,'')+'/chat/completions',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+key},body:JSON.stringify({model:model||'deepseek-chat',messages:[{role:'user',content:'回复JSON {"ok":1}'}],temperature:0,response_format:{type:'json_object'}})});
     const j=await resp.json();
-    msg.textContent=resp.ok?'✅ 连接成功：'+(j.choices?j.choices[0].message.content:'')+'':'❌ HTTP '+resp.status;
-  }catch(e){msg.textContent='❌ 失败：'+e.message+'（多为跨域/网络限制）';}
+    msg.textContent=resp.ok?'✅ 连接成功：'+(j.choices?j.choices[0].message.content:'')+'':(()=>{let body='';try{body=JSON.stringify(j);}catch(_){}return '❌ '+fmtAIError({message:'HTTP '+resp.status+' '+(body||'').slice(0,80)});})();
+  }catch(e){msg.textContent='❌ '+fmtAIError(e);}
 };
 // 三餐 AI 查询按钮
 ['breakfast','lunch','dinner'].forEach(kind=>{

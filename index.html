@@ -2505,7 +2505,10 @@ const FOOD_ALIAS={
   '豬肉':'猪肉','豬扒':'猪扒','豬排':'猪扒','五花腩':'五花肉',
   '雞肉':'鸡肉','雞胸':'鸡胸肉','雞腿':'鸡腿肉','雞髀':'鸡腿肉','雞翼':'鸡翅','雞中翼':'鸡翅',
   '牛柳':'牛肉','牛脷':'牛肉','肉碎':'猪肉','猪颈肉':'猪肉','烧肉':'猪肉',
-  '肉':'猪肉','鱼':'鱼肉'
+  '肉':'猪肉','鱼':'鱼肉',
+  /* 菜品/搭配别名（提升「番茄炒蛋」类自由输入识别） */
+  '炒蛋':'鸡蛋','煎蛋':'鸡蛋','煮蛋':'鸡蛋','蒸蛋':'鸡蛋','荷包蛋':'鸡蛋','白煮蛋':'鸡蛋','蛋':'鸡蛋',
+  '白灼虾':'虾仁','盐水虾':'虾仁','清蒸鱼':'鱼肉','煎鱼':'鱼肉','炒肉':'猪肉','蒸肉饼':'猪肉'
 };
 const DINNER_MENU=[
   {n:'清蒸鱼 + 时蔬',cal:280,carb:12,tag:'low'},{n:'香煎鸡胸 + 芦笋',cal:320,carb:8,tag:'low'},
@@ -2523,12 +2526,49 @@ function buildFoodTerms(){
   terms.sort((x,y)=>y.term.length-x.term.length);
   return terms;
 }
-function calcByQty(food,qty){
-  if(food.u==='100g'||food.u==='100ml')return food.cal*(qty/100);
-  return food.cal*qty;
+function calcByQty(food,amount){ // amount: 100g/ml 食物传克数，计件食物传件数
+  if(food.u==='100g'||food.u==='100ml')return food.cal*(amount/100);
+  return food.cal*amount;
+}
+/* 中文数字 → 阿拉伯（一二三四五六七八九十/两/双/半/零/几/十X/X十） */
+function cnNumToArabic(s){
+  if(/^\d+(\.\d+)?$/.test(s))return parseFloat(s);
+  s=s.trim();
+  if(s==='半')return 0.5;
+  if(s==='两'||s==='双'||s==='二')return 2;
+  if(s==='几'||s==='数'||s==='俩')return 2;
+  if(s.includes('百')){
+    const p=s.split('百');
+    const h=(p[0]==='')?1:(cnNumToArabic(p[0])||1);
+    const r=cnNumToArabic(p[1]||'');
+    return h*100+(isNaN(r)?0:r);
+  }
+  if(s.includes('千')){
+    const p=s.split('千');
+    const h=(p[0]==='')?1:(cnNumToArabic(p[0])||1);
+    const r=cnNumToArabic(p[1]||'');
+    return h*1000+(isNaN(r)?0:r);
+  }
+  const d={'零':0,'一':1,'壹':1,'三':3,'叁':3,'四':4,'肆':4,'五':5,'伍':5,'六':6,'陆':6,'七':7,'柒':7,'八':8,'捌':8,'九':9,'玖':9};
+  if(s.length===1)return (s in d)?d[s]:NaN;
+  if(s.includes('十')){
+    const p=s.split('十');
+    const tens=(p[0]==='')?1:(d[p[0]]||0);
+    const ones=(p[1]==='')?0:(d[p[1]]||0);
+    return tens*10+ones;
+  }
+  let t=0,ok=true;
+  for(const ch of s){if(!(ch in d)){ok=false;break;}t=t*10+d[ch];}
+  return ok?t:NaN;
 }
 /* 分词式识别：将一段自由文本拆成多个食物并累加热量/碳水
-   例：「番茄豆腐鸡蛋」→ 番茄+豆腐+鸡蛋；「胜瓜炒肉」→ 丝瓜(胜瓜)+猪肉(肉碎) */
+   支持：
+   - 中文/阿拉伯数量：一根香蕉 / 2根香蕉 / 半斤红薯 / 两碗米饭
+   - 量词换算：碗·块·片·个≈100g；两=50g；斤=500g；克制等按克计
+   - 食物搭配：番茄炒蛋 → 番茄 + 鸡蛋（连接词跳过 + 菜品别名） */
+const _NUM_RE=/^([0-9]+(?:\.[0-9]+)?|[一二三四五六七八九十百零两双半几数俩]+)/;
+const _MW_RE=/^[个只根条片碗杯块份把颗粒串瓣g克毫升ml两斤]+/i;
+const _CONN_RE=/[炒蒸煮拌烧烤煎炖炸卤凉拼配和与大份小加另及、，,与]+/;
 function matchFoodCal(text){
   text=(text||'').trim();
   if(!text)return {cal:0,carb:0,matched:'',fuzzy:true,parts:[]};
@@ -2537,22 +2577,40 @@ function matchFoodCal(text){
   while(i<text.length){
     const ch=text[i];
     if(/\s|[，,、;；:：.。·]/.test(ch)){i++;continue;}
-    // 可选份量前缀（作用于紧随其后的食物）
+    // 1) 数量前缀（中文或阿拉伯）
     let qty=1,explicit=false,j=i;
-    const qm=text.slice(i).match(/^(\d+(?:\.\d+)?)\s*(个|根|只|片|碗|杯|块|份|把|颗|串|ml|g|克|毫升|两|斤)?/i);
-    if(qm){qty=parseFloat(qm[1])||1;explicit=true;j=i+qm[0].length;}
-    // 从该位置贪心匹配最长食物名（含方言别名）
+    const nm=text.slice(i).match(_NUM_RE);
+    if(nm){const v=cnNumToArabic(nm[1]);if(!isNaN(v)){qty=v;explicit=true;j=i+nm[0].length;}}
+    // 2) 量词
+    let mw=null;
+    const mm=text.slice(j).match(_MW_RE);
+    if(mm){mw=mm[0];j+=mm[0].length;}
+    // 3) 从该位置贪心匹配最长食物名（含方言别名）
     let best=null;
     for(const t of terms){ if(t.term.length && text.startsWith(t.term,j)){best=t;break;} }
     if(best){
-      // 未显式给份量且食物按 100g/ml 计，则默认一份=100g/ml
-      const serve=(!explicit && (best.u==='100g'||best.u==='100ml'))?100:qty;
-      const cal=Math.round(calcByQty(best,serve));
-      const carb=Math.round((best.carb||0)*(best.u==='100g'||best.u==='100ml'?serve/100:serve));
-      parts.push({name:best.name,qty:serve,cal,carb});
+      const isW=(best.u==='100g'||best.u==='100ml');
+      let amount, realQty;
+      if(isW){
+        if(mw && /^(g|克|毫升|ml)$/i.test(mw)) amount=qty;            // 显式克/毫升
+        else if(mw==='两') amount=qty*50;                            // 两=50g
+        else if(mw==='斤') amount=qty*500;                           // 斤=500g
+        else if(mw) amount=qty*100;                                  // 碗/块/片/个…≈100g/份
+        else amount=explicit?qty:100;                                // 裸数字=克；无数量=默认100g
+        realQty=amount+'g';
+      }else{
+        amount=qty; realQty=qty+(best.u||'');                        // 计件食物
+      }
+      const cal=Math.round(calcByQty(best,amount));
+      const carb=Math.round((best.carb||0)*(isW?amount/100:amount));
+      parts.push({name:best.name,qty:realQty,cal,carb});
       totalCal+=cal;totalCarb+=carb;
       i=j+best.term.length;
-    } else { unmatched+=text[i]; i++; }
+    } else {
+      // 拆不出食物：跳过一个连接词再试（应对「番茄炒蛋」类搭配）
+      if(_CONN_RE.test(ch)){i++;continue;}
+      unmatched+=ch;i++;
+    }
   }
   const matchedNames=parts.map(p=>p.name);
   const fuzzy = parts.length===0 || unmatched.length>0;

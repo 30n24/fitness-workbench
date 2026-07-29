@@ -1,6 +1,6 @@
-// 健身计划工作台 Service Worker - 离线缓存 v15
+// 健身计划工作台 Service Worker - 离线缓存 v16
 // 策略：缓存优先 + 后台更新 + 错误回退（确保离线/隧道失效时都能用）
-const CACHE_NAME = 'fitness-workbench-v15';
+const CACHE_NAME = 'fitness-workbench-v16';
 const CACHE_URLS = [
   './',
   './index.html',

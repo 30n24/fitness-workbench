@@ -1678,7 +1678,7 @@ const MENUS = {
 const KEY='fitness_workbench_v2';
 let state=load();
 // 强制缓存更新：版本变化时清除所有 sw 缓存并硬刷新
-const APP_VER='15';
+const APP_VER='16';
 if(localStorage.getItem('app_ver')!==APP_VER){
   localStorage.setItem('app_ver',APP_VER);
   if('caches' in window)caches.keys().then(n=>{n.forEach(c=>{if(c.includes('fitness-workbench'))caches.delete(c);});}).then(()=>location.reload(true));
@@ -1880,14 +1880,19 @@ function setSyncStatus(s){
 function cleanupStaleCheckins(){
   ['A','B'].forEach(p=>{
     const cks=state[p]?.checkins; if(!cks)return;
+    const today=todayKey();
     Object.keys(cks).forEach(k=>{
-      if(k===todayKey())return;
-      const c=cks[k];
-      if(c&&c.partChecked&&!c.rest){
-        const hasEx=state[p].customEx?.[k]?.length>0;
-        const hasCardio=state[p].cardio?.[k]?.length>0;
-        if(!hasEx&&!hasCardio) delete cks[k];
-      }
+      if(k===today)return;
+      const c=cks[k]; if(!c)return;
+      const hasEx=state[p].customEx?.[k]?.length>0;
+      const hasCardio=state[p].cardio?.[k]?.length>0;
+      const hasTraining=hasEx||hasCardio||Object.keys(c.exercises||{}).length>0;
+      // 只有打卡标记但冇训练记录 → 虚假打卡删除
+      if(c.partChecked&&!c.rest&&!hasTraining){ delete cks[k]; return; }
+      // 有休息标记但同时有训练记录 → 数据矛盾（以训练为准），清除休息
+      if(c.rest&&hasTraining){ c.rest=false; c.partChecked=true; c.part=c.part||null; }
+      // 有休息标记但冇任何记录 → 系老bug污染，删除
+      if(c.rest&&!hasTraining){ delete cks[k]; }
     });
   });
   saveLocal();

@@ -3548,7 +3548,7 @@ async function aiLookupFood(raw,kind,inputId){
   if(!cfg||!cfg.key){showFoodHint('未配置 AI：去「数据管理 → 🤖 AI 查热量」填写 Key');openAiCfg();return;}
   showFoodHint('🔍 正在用 AI 查询「'+raw+'」热量…');
   try{
-    const sys='你是专业营养师。用户给你一个食物名称（可能含份量/做法）。请估算它「一份典型分量」的热量(千卡)与碳水(克)。只输出 JSON：{"cal":数字,"carb":数字,"unit":"份","note":"简短中文说明"}，不要任何多余文字。';
+    const sys='你是专业营养师。用户给你一个食物描述（可能含份量/做法/口语）。若用户提到份量、重量或碗数，请按佢讲嘅实际份量估算；若冇提，就按「一份典型分量」估。请输出 JSON：{"cal":数字,"carb":数字,"unit":"份","food":"规范中文食物名（去口语/品牌/描述，例如『牛肉面加卤蛋』回『牛肉面+卤蛋』、『一碗猪脚饭』回『猪脚饭』）","note":"简短中文说明"}，唔好有任何多余文字。';
     const body={model:cfg.model||'deepseek-chat',messages:[{role:'system',content:sys},{role:'user',content:raw}],temperature:0.2,response_format:{type:'json_object'}};
     const resp=await fetch(cfg.base.replace(/\/+$/,'')+'/chat/completions',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+cfg.key},body:JSON.stringify(body)});
     if(!resp.ok){const t=await resp.text().catch(()=>'');throw new Error('HTTP '+resp.status+(t?(' '+t.slice(0,80)):''));}
@@ -3558,17 +3558,18 @@ async function aiLookupFood(raw,kind,inputId){
     const o=mm?JSON.parse(mm[0]):null;
     if(!o||typeof o.cal!=='number')throw new Error('AI 返回格式异常');
     const cal=Math.round(o.cal),carb=Math.round(o.carb||0),unit=o.unit||'份';
+    const food=(o.food&&(''+o.food).trim())||raw.trim();
     if(!profile().foods)profile().foods=[];
-    if(!profile().foods.some(f=>f.n===raw))profile().foods.push({n:raw,cal,carb,u:unit});
+    if(!profile().foods.some(f=>f.n===food))profile().foods.push({n:food,cal,carb,u:unit});
     save();renderCustomFood();if(curPage==='diet')renderDiet();
     if(!profile()[kind])profile()[kind]={};
     if(!profile()[kind][recKey()])profile()[kind][recKey()]=[];
-    profile()[kind][recKey()].push({name:raw,cal,carb,matched:raw});
+    profile()[kind][recKey()].push({name:food,cal,carb,matched:food});
     save();
     const inp=document.getElementById(inputId);if(inp)inp.value='';
     if(kind==='breakfast')renderBreakfast();else if(kind==='lunch')renderLunch();else renderDinner();
     renderDietSummary();
-    showFoodHint('✅ AI：'+raw+' ≈ '+cal+'kcal / '+carb+'g碳（已存为自定义食物）');
+    showFoodHint('✅ AI：'+food+' ≈ '+cal+'kcal / '+carb+'g碳（已存为自定义食物）');
   }catch(e){
     showFoodHint('⚠️ AI 查询失败：'+e.message+'（检查 Key/网络；若提示跨域，可在「自定义」里填支持浏览器跨域的接口地址）');
   }
@@ -3643,7 +3644,7 @@ async function aiLookupExercise(raw,inputId){
   showFoodHint('🔍 正在用 AI 估算「'+raw+'」消耗…');
   const bw=latestWeight(curProfile)||60;
   try{
-    const sys='你是专业健身教练。用户做咗一个抗阻/自重训练动作，会俾你动作名同佢嘅表现（组数、次数、负重）。请按佢体重 '+bw+'kg 估算呢次训练总消耗热量(千卡)。只输出 JSON：{"cal":数字,"sets":数字,"reps":数字,"weight":数字或0,"note":"简短中文说明"}，唔好有任何多余文字。若用户冇讲负重，weight 填 0（当作自重动作）。';
+    const sys='你是专业健身教练。用户做咗一个抗阻/自重训练动作，会俾你动作名同佢嘅表现（组数、次数、负重，可能夹带口语/描述）。请按佢体重 '+bw+'kg 估算呢次训练总消耗热量(千卡)。只输出 JSON：{"cal":数字,"sets":数字,"reps":数字,"weight":数字或0,"name":"动作规范中文名（去口语/去描述，例如用户讲『今天深蹲搞了』回『深蹲』、『练咗硬拉好攰』回『硬拉』）","note":"简短中文说明"}，唔好有任何多余文字。若用户冇讲负重，weight 填 0（当作自重动作）。';
     const body={model:cfg.model||'deepseek-chat',messages:[{role:'system',content:sys},{role:'user',content:raw}],temperature:0.2,response_format:{type:'json_object'}};
     const resp=await fetch(cfg.base.replace(/\/+$/,'')+'/chat/completions',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+cfg.key},body:JSON.stringify(body)});
     if(!resp.ok){const t=await resp.text().catch(()=>'');throw new Error('HTTP '+resp.status+(t?(' '+t.slice(0,80)):''));}
@@ -3653,7 +3654,7 @@ async function aiLookupExercise(raw,inputId){
     const o=mm?JSON.parse(mm[0]):null;
     if(!o||typeof o.cal!=='number')throw new Error('AI 返回格式异常');
     const p=parseExPerf(raw);
-    const name=p.name||raw.trim();
+    const name=(o.name&&(''+o.name).trim())||p.name||raw.trim();
     const sets=o.sets||p.sets, reps=o.reps||p.reps, weight=(o.weight||p.weight||0);
     const cal=Math.round(o.cal);
     addCustomEx(name,sets,reps,weight,cal,o.note,'ai');

@@ -1702,7 +1702,15 @@ function updateRecDateBar(){
   const wk=['日','一','二','三','四','五','六'];const d=curRecDate;
   const lbl=document.getElementById('rdLabel'); if(lbl)lbl.textContent=recDayLabel();
   const tb=document.getElementById('rdToday'); if(tb)tb.style.display=isRecToday()?'none':'';
-  const inp=document.getElementById('rdInput'); if(inp)inp.value=recKey();
+  // 修复 iOS Safari date input bug：程序设 input.value 会异步触发 change，且 this.value 仍是旧值，
+  // 会错误调 setRecDate 把 curRecDate 改回今日。先解绑 change handler 再赋值。
+  const inp=document.getElementById('rdInput');
+  if(inp){
+    const prevHandler=inp.onchange;
+    inp.onchange=null;
+    inp.value=recKey();
+    inp.onchange=prevHandler;
+  }
   const chip=document.getElementById('dateChip'); if(chip)chip.textContent=(d.getMonth()+1)+'月'+d.getDate()+'日 周'+wk[d.getDay()];
   // 休息按钮文案：今日→休息，过往无记录→补存，有训练→隐藏
   const rb=document.getElementById('restBtn');

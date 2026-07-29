@@ -717,6 +717,7 @@ html.dark .dash-card{background:#171f30}
 .ep-sum b{color:var(--text)}
 .el-item{display:inline-flex;align-items:center;gap:4px;background:linear-gradient(135deg,rgba(91,140,255,.1),rgba(244,114,182,.07));border:1px solid var(--border);border-radius:20px;padding:6px 10px;font-size:13px;font-weight:600}
 .el-item .el-add{cursor:pointer;color:var(--primary);font-weight:800;font-size:17px;margin-left:2px;line-height:1}
+.el-item .el-chart{cursor:pointer;font-size:14px;line-height:1;margin-left:2px}
 .el-empty{font-size:12px;color:var(--muted);text-align:center;padding:6px 0;width:100%}
 /* ===== 自定义动作 + AI 计卡 ===== */
 .custom-ex-card{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:14px;margin:14px 2px 0}
@@ -730,8 +731,10 @@ html.dark .dash-card{background:#171f30}
 .ce-name{font-size:14px;font-weight:700}
 .ce-meta{font-size:11px;color:var(--muted)}
 .ce-kind{font-size:10px;font-weight:700;color:#fff;background:linear-gradient(135deg,#8b5cf6,#6366f1);border-radius:999px;padding:1px 7px;margin-left:2px}
-.ce-side{display:flex;align-items:center;gap:10px;flex-shrink:0}
+.ce-side{display:flex;align-items:center;gap:8px;flex-shrink:0}
 .ce-cal{font-size:12px;font-weight:700;color:var(--pink,#ec4899)}
+.ce-edit{font-size:15px;color:#5b8cff;cursor:pointer;padding:5px 7px;border-radius:9px;background:rgba(91,140,255,.10);line-height:1;transition:.15s;flex-shrink:0}
+.ce-edit:active{background:rgba(91,140,255,.24)}
 .ce-del{font-size:15px;color:#ef4444;cursor:pointer;padding:5px 8px;border-radius:9px;background:rgba(239,68,68,.10);line-height:1;transition:.15s;flex-shrink:0}
 .ce-del:active{background:rgba(239,68,68,.24)}
 .ce-note{font-size:11px;color:var(--muted);margin-top:2px}
@@ -1057,7 +1060,7 @@ html.dark .dash-card{background:#171f30}
 
   <div class="section-title" style="margin-top:20px">👀 对方今日动态 <span class="hint" id="partnerNameLabel">—</span></div>
   <div id="partnerToday"></div>
-  <div style="text-align:center;margin-top:18px"><span class="report-btn" id="reportBtn">📊 生成本月报告</span><span class="report-btn" id="badgeBtn" style="margin-left:10px;background:linear-gradient(135deg,var(--orange),var(--pink))">🏆 成就徽章</span></div>
+  <div style="text-align:center;margin-top:18px"><span class="report-btn" id="reportBtn">📊 生成本月报告</span><span class="report-btn" id="weekReportBtn" style="margin-left:8px;background:linear-gradient(135deg,#22d3ee,#34d399)">📅 本周报告</span><span class="report-btn" id="badgeBtn" style="margin-left:8px;background:linear-gradient(135deg,var(--orange),var(--pink))">🏆 成就徽章</span></div>
 </main>
 
 <!-- 身体数据页 -->
@@ -1750,22 +1753,50 @@ async function cloudPut(data,sha){
   const j=await r.json();
   return j.content.sha;
 }
+/* 字段级合并常量与辅助（云同步用） */
+const SYNC_DATE_FIELDS=['checkins','diet','breakfast','lunch','dinner','eatOut','expenses','body','water','cardio','badminton','customEx','notes'];
+const SYNC_SIMPLE_FIELDS=['exLib','foods','name','meta'];
+function mergeDateField(cloudObj,localObj,preferCloud){
+  const out={...localObj};
+  Object.keys(cloudObj||{}).forEach(k=>{
+    if(out[k]===undefined) out[k]=cloudObj[k]; // cloud 独有 → 保留
+    else if(preferCloud) out[k]=cloudObj[k];    // 重叠 → 取较新版
+  });
+  return out;
+}
+function mergeSimple(localVal,cloudVal,preferCloud){
+  if(cloudVal===undefined)return localVal;
+  if(localVal===undefined)return cloudVal;
+  return preferCloud?cloudVal:localVal;
+}
 async function syncPush(p){
   const {data,sha}=await cloudGet();
   data.A=data.A||{};data.B=data.B||{};data._sync=data._sync||{A:0,B:0};
-  data[p]=JSON.parse(JSON.stringify(state[p]));
-  data._sync[p]=state._sync[p]||0;
+  // 字段级合并：每个日期键字段取并集，local 覆盖（我哋推上去的系最新）
+  SYNC_DATE_FIELDS.forEach(f=>{
+    const cloudF=data[p][f]||{};const localF=state[p][f]||{};
+    data[p][f]={...cloudF};
+    Object.keys(localF).forEach(k=>{ data[p][f][k]=localF[k]; });
+  });
+  SYNC_SIMPLE_FIELDS.forEach(f=>{ if(state[p][f]!==undefined) data[p][f]=state[p][f]; });
+  data._sync[p]=Math.max(data._sync[p]||0, state._sync[p]||0);
   await cloudPut(data,sha);
 }
 async function syncPull(){
   const {data}=await cloudGet();
   let changed=false;
   ['A','B'].forEach(q=>{
-    if((data._sync&&data._sync[q]||0) > (state._sync[q]||0)){
-      state[q]=data[q]||state[q];
-      state._sync[q]=data._sync[q];
-      changed=true;
-    }
+    const cloudTs=data._sync&&data._sync[q]||0;
+    const localTs=state._sync[q]||0;
+    if(cloudTs<=localTs)return; // 云端无更新
+    SYNC_DATE_FIELDS.forEach(f=>{
+      const cloudF=data[q][f]||{};const localF=state[q][f]||{};
+      const merged=mergeDateField(cloudF,localF,true); // cloud 较新，重叠处取 cloud
+      state[q][f]=merged;
+    });
+    SYNC_SIMPLE_FIELDS.forEach(f=>{ state[q][f]=mergeSimple(state[q][f],data[q][f],true); });
+    state._sync[q]=cloudTs;
+    changed=true;
   });
   if(changed)saveLocal();
   return changed;
@@ -2883,6 +2914,7 @@ function switchPage(p){
   if(p==='stats')renderStats();
   if(p==='expenses')renderExpenses();
   if(p==='photos')renderPhotos();
+  renderWater(); // 每次切页更新饮水卡片（目标按体重动态变化）
   window.scrollTo(0,0);
 }
 
@@ -3305,8 +3337,12 @@ function toggleTheme(){
   showFoodHint(next==='dark'?'已切换深色模式':'已切换浅色模式');
 }
 
-/* 饮水 */
-const WATER_GOAL=8;
+/* 饮水（目标按体重×35ml÷250ml/杯，最低 4 杯；无体重回退 8） */
+function waterGoal(){
+  const w=latestWeight(curProfile);
+  if(w==null)return 8;
+  return Math.max(4, Math.round(w*0.14));
+}
 function renderWater(){
   const k=recKey();
   const n=profile().water?.[k]||0;
@@ -3314,14 +3350,14 @@ function renderWater(){
   const count=document.getElementById('waterCount');
   const card=document.getElementById('waterCard');
   const hint=document.getElementById('waterHint');
-  if(fill)fill.style.width=Math.min(100,Math.round(n/WATER_GOAL*100))+'%';
-  if(count&&count.firstChild)count.firstChild.nodeValue=n+' / '+WATER_GOAL+' 杯 ';
+  if(fill)fill.style.width=Math.min(100,Math.round(n/waterGoal()*100))+'%';
+  if(count&&count.firstChild)count.firstChild.nodeValue=n+' / '+waterGoal()+' 杯 ';
   // 无记录 → 提示喝水；达标 → 鼓励提示
   if(card)card.classList.toggle('remind', n===0);
   if(hint){
     if(n===0){hint.style.display='block';hint.textContent='💧 今日仲未饮水，点 +1 开始补水，保持身体水润～';}
-    else if(n<WATER_GOAL){hint.style.display='none';}
-    else{hint.style.display='block';hint.textContent='🎉 已达标 '+n+'/'+WATER_GOAL+' 杯，继续维持！';}
+    else if(n<waterGoal()){hint.style.display='none';}
+    else{hint.style.display='block';hint.textContent='🎉 已达标 '+n+'/'+waterGoal()+' 杯，继续维持！';}
   }
 }
 function drinkWater(){
@@ -3331,7 +3367,7 @@ function drinkWater(){
   const after=before+1;
   profile().water[k]=after;
   save();renderWater();
-  if(after===WATER_GOAL)showWaterCheer(after); // 饮够每日目标 → 弹动画鼓励
+  if(after===waterGoal())showWaterCheer(after); // 饮够每日目标 → 弹动画鼓励
 }
 function resetWater(){const k=recKey();if(!profile().water)profile().water={};profile().water[k]=0;save();renderWater();}
 function showWaterCheer(n){
@@ -3529,6 +3565,64 @@ function generateReport(){
   const cv=overlay.querySelector('#rcCanvas');
   const bpts=Object.keys(data.body||{}).filter(k=>k.startsWith(mk)).sort().filter(k=>data.body[k].weight).map(k=>({d:k,v:data.body[k].weight}));
   if(bpts.length>=2)drawLineChart(cv,bpts,'#22d3ee','kg');else cv.style.display='none';
+  // 加部位分布柱状图
+  const pcv=document.createElement('canvas');pcv.className='rc-canvas';pcv.id='rcPartCanvas';
+  overlay.querySelector('.report-card').appendChild(pcv);
+  drawPartBars(pcv,partDays);
+}
+/* 本周报告 */
+function generateWeekReport(){
+  const data=profile();const d=new Date();
+  // 生成最近 7 天的日期 key
+  const keys=[];for(let i=6;i>=0;i--){const x=new Date(d);x.setDate(x.getDate()-i);keys.push(`${x.getFullYear()}-${String(x.getMonth()+1).padStart(2,'0')}-${String(x.getDate()).padStart(2,'0')}`);}
+  let checkinDays=0,restDays=0,partDays={};
+  Object.keys(data.checkins).forEach(k=>{if(keys.includes(k)&&data.checkins[k].partChecked){checkinDays++;if(data.checkins[k].rest)restDays++;const p=data.checkins[k].part;if(p)partDays[p]=(partDays[p]||0)+1;}});
+  const trainDays=checkinDays-restDays;
+  let totalCal=0;
+  Object.keys(data.cardio||{}).forEach(k=>{if(keys.includes(k))(data.cardio[k]||[]).forEach(c=>{totalCal+=c.cal!=null?c.cal:Math.round((c.duration||0)*((CARDIO[c.type]&&CARDIO[c.type].cpm)||8));});});
+  Object.keys(data.badminton||{}).forEach(k=>{if(keys.includes(k))totalCal+=(data.badminton[k].duration||0)*7;});
+  const rate=Math.round(checkinDays/7*100);
+  const overlay=document.createElement('div');overlay.className='report-overlay';
+  overlay.onclick=e=>{if(e.target===overlay)overlay.remove();};
+  overlay.innerHTML=`<div class="report-card">
+    <div class="rc-head"><div class="rc-name">${getPName()} · 本周报告</div><div class="rc-sub">训练${trainDays}天 · 休息${restDays}天 · 完成率${rate}%</div></div>
+    <div class="rc-stat"><span class="rk">📅 本周训练</span><span class="rv">${trainDays}/7天</span></div>
+    <div class="rc-stat"><span class="rk">🛌 休息日</span><span class="rv">${restDays}天</span></div>
+    <div class="rc-stat"><span class="rk">🔥 运动消耗</span><span class="rv">${totalCal}kcal</span></div>
+    <canvas class="rc-canvas" id="rcCanvasWk"></canvas>
+    <div class="rc-close">关闭</div>
+  </div>`;
+  document.body.appendChild(overlay);
+  overlay.querySelector('.rc-close').onclick=()=>overlay.remove();
+  const cv=overlay.querySelector('#rcCanvasWk');
+  drawPartBars(cv,partDays);
+}
+/* 部位训练分布柱状图（水平，5 大部位） */
+function drawPartBars(canvas,partDays){
+  const ctx=canvas.getContext('2d');
+  const dpr=window.devicePixelRatio||1;
+  const W=canvas.clientWidth||canvas.parentElement.clientWidth||300;
+  const H=220;
+  canvas.width=W*dpr;canvas.height=H*dpr;ctx.setTransform(dpr,0,0,dpr,0,0);
+  ctx.clearRect(0,0,W,H);
+  const max=Math.max(1,...TRAIN_PARTS.map(p=>partDays[p.key]||0));
+  const barH=26;const gap=10;const top=20;const left=55;const right=20;
+  const bw=W-left-right;
+  ctx.font='12px sans-serif';ctx.textBaseline='middle';
+  TRAIN_PARTS.forEach((p,i)=>{
+    const y=top+i*(barH+gap);
+    const v=partDays[p.key]||0;
+    const w=bw*(v/max);
+    // label
+    ctx.fillStyle='var(--text,#e8edf6)';ctx.textAlign='right';ctx.fillText(p.emoji+' '+p.name,left-6,y+barH/2);
+    // bar bg
+    ctx.fillStyle='rgba(150,160,180,.12)';ctx.beginPath();ctx.roundRect(left,y,bw,barH,5);ctx.fill();
+    // bar fill
+    const colors=['#5b8cff','#22d3ee','#34d399','#f472b6','#a78bfa'];
+    ctx.fillStyle=colors[i%colors.length];ctx.beginPath();ctx.roundRect(left,y,w,barH,5);ctx.fill();
+    // value
+    ctx.fillStyle='#fff';ctx.textAlign='left';ctx.fillText(v+'天',left+w+6,y+barH/2);
+  });
 }
 
 /* ===== 拍照日记（IndexedDB 储存 + Canvas 压缩）===== */
@@ -3965,6 +4059,11 @@ function addCustomEx(name,sets,reps,weight,cal,note,ai,part,detail){
   if(!profile().customEx)profile().customEx={};
   const k=recKey(); if(!profile().customEx[k])profile().customEx[k]=[];
   profile().customEx[k].push({name,sets,reps,weight:weight||0,cal:calFinal,note:note||'',ai:!!ai,done:true,part:pk,detail:detail||null});
+  // 记录进步曲线
+  const setsData=detail&&detail.length
+    ? detail.map(d=>({weight:d.weight||weight||0,reps:d.reps||reps||10}))
+    : Array.from({length:sets||1},()=>({weight:weight||0,reps:reps||10}));
+  recordExProgress(name,setsData);
   // 写入「我的动作库」（历史，去重，更新上次表现）
   if(!profile().exLib)profile().exLib=[];
   const lib=profile().exLib.find(x=>x.name===name);
@@ -3979,7 +4078,7 @@ function renderExLib(){
   el.innerHTML='';
   lib.forEach(e=>{
     const item=document.createElement('div');item.className='el-item';
-    item.innerHTML='<span>'+e.name+'</span><span class="el-add" title="记录今日">＋</span>';
+    item.innerHTML='<span>'+e.name+'</span><span class="el-chart" title="进步曲线">📊</span><span class="el-add" title="记录今日">＋</span>';
     item.querySelector('.el-add').onclick=()=>{
       let perf;
       if(e.detail&&e.detail.length){
@@ -3992,6 +4091,8 @@ function renderExLib(){
       const inp=document.getElementById('exInput');inp.value=perf;inp.focus();
       showFoodHint('已填入「'+perf+'」，确认或改完撳「添加」（或 🔍AI 更准）');
     };
+    const chartBtn=item.querySelector('.el-chart');
+    if(chartBtn)chartBtn.onclick=()=>showProgressChart(e.name);
     el.appendChild(item);
   });
 }
@@ -4008,12 +4109,21 @@ function renderCustomEx(){
     const div=document.createElement('div');div.className='ce-item'+(e.done?' on':'');
     div.innerHTML='<div class="ce-main"><span class="ce-name">'+e.name+'</span>'+kindTag+
       '<span class="ce-meta">'+meta+'</span></div>'+
-      '<div class="ce-side"><span class="ce-cal">🔥'+(e.cal||0)+'kcal</span><span class="ce-del" data-i="'+i+'">✕</span></div>'+
+      '<div class="ce-side"><span class="ce-cal">🔥'+(e.cal||0)+'kcal</span><span class="ce-edit" data-i="'+i+'">✎</span><span class="ce-del" data-i="'+i+'">✕</span></div>'+
       (e.note?'<div class="ce-note">'+e.note+'</div>':'');
     el.appendChild(div);
     div.querySelector('.ce-del').onclick=()=>{
       if(!confirm('删除「'+e.name+'」呢个动作？'))return;
       profile().customEx[k].splice(i,1);save();renderCustomEx();renderExLib();renderExParts();renderCalorieSummary();if(curPage==='stats')renderStats();
+    };
+    div.querySelector('.ce-edit').onclick=()=>{
+      const txt=(e.detail&&e.detail.length)
+        ? e.name+' '+(e.detail.length)+'组'+(e.detail.map(d=>d.weight).filter(v=>v>0).join('/')).replace(/(.)$/,'$1kg')+(' '+(e.detail.map(d=>d.reps).join('/'))+'次')
+        : e.name+' '+(e.sets||'?')+'组x'+(e.reps||'?')+'次'+(e.weight?('x'+e.weight+'kg'):'');
+      document.getElementById('exInput').value=txt;
+      profile().customEx[k].splice(i,1);save();renderCustomEx();renderExLib();renderExParts();renderCalorieSummary();
+      document.getElementById('exInput').focus();
+      showFoodHint('✎ 已填入旧数据编辑，改完撳「添加」');
     };
   });
 }
@@ -4037,7 +4147,7 @@ async function aiLookupExercise(raw,inputId){
     const sets=o.sets||p.sets, reps=o.reps||p.reps, weight=(o.weight||p.weight||0);
     const cal=Math.round(o.cal);
     const part=partKeyFromName(o.part)||classifyPart(name);
-    addCustomEx(name,sets,reps,weight,cal,o.note,'ai',part,null);
+    addCustomEx(name,sets,reps,weight,cal,o.note,'ai',part,p.detail);
     const inp=document.getElementById(inputId);if(inp)inp.value='';
     showFoodHint('✅ AI：'+name+' ≈ '+cal+'kcal（'+sets+'组×'+reps+'次'+(weight?('·'+weight+'kg'):'')+'）已记录');
   }catch(e){
@@ -4150,8 +4260,9 @@ document.getElementById('cfSaveBtn').onclick=()=>{
 document.getElementById('bodySave').onclick=saveBody;
 document.getElementById('metaSave').onclick=saveMeta;
 document.getElementById('metaActivity')&&(document.getElementById('metaActivity').onchange=()=>{const a=ACTIVITY_LEVELS.find(x=>+x.key===+document.getElementById('metaActivity').value);const ref=document.getElementById('metaActivityRef');if(ref)ref.textContent=a?a.ref:'选咗活动水平会显示参考说明';});
-// 月度报告
+// 月度/周度报告
 document.getElementById('reportBtn').onclick=generateReport;
+document.getElementById('weekReportBtn').onclick=generateWeekReport;
 // 成就徽章
 document.getElementById('badgeBtn').onclick=openBadges;
 // AI 查热量设置

@@ -945,6 +945,7 @@ html.dark .dash-card{background:#171f30}
   </div>
   <button class="checkin-btn" id="checkinBtn">完成今日打卡</button>
   <button class="rest-btn" id="restBtn"></button>
+  <div id="recDateDbg" style="font-size:10px;color:var(--muted);text-align:center;margin:2px 0 0"></div>
 
   <div class="section-title" style="margin-top:20px">🏃 有氧运动</div>
   <div class="cardio-card">
@@ -2745,6 +2746,9 @@ function renderCheckinBtn(){
   btn.classList.toggle('done',done||rest);
   btn.classList.toggle('rest',rest);
   const lb=recDayLabel();
+  // 调试：显示当前日期key
+  const dbg=document.getElementById('recDateDbg');
+  if(dbg)dbg.textContent='日期: '+recKey()+' | 今天: '+todayKey()+' | isToday: '+isRecToday()+' | rest: '+rest+' | done: '+done+(!rest&&!done?' | 📝 补登记':'');
   if(isRecToday()){
     if(rest)btn.textContent='🛌 今日休息中（点此改为训练）';
     else if(done)btn.textContent='✓ 今日已打卡（点此取消）';

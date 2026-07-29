@@ -733,6 +733,8 @@ html.dark .dash-card{background:#171f30}
 .ce-name{font-size:14px;font-weight:700}
 .ce-meta{font-size:11px;color:var(--muted)}
 .ce-kind{font-size:10px;font-weight:700;color:#fff;background:linear-gradient(135deg,#8b5cf6,#6366f1);border-radius:999px;padding:1px 7px;margin-left:2px}
+.ce-part{font-size:11px;font-weight:700;color:var(--primary);background:rgba(91,140,255,.12);border-radius:999px;padding:1px 8px;margin-left:2px;cursor:pointer;transition:.15s}
+.ce-part:active{background:rgba(91,140,255,.25)}
 .ce-side{display:flex;align-items:center;gap:8px;flex-shrink:0}
 .ce-cal{font-size:12px;font-weight:700;color:var(--pink,#ec4899)}
 .ce-edit{font-size:15px;color:#5b8cff;cursor:pointer;padding:5px 7px;border-radius:9px;background:rgba(91,140,255,.10);line-height:1;transition:.15s;flex-shrink:0}
@@ -4140,8 +4142,10 @@ function renderCustomEx(){
       ? e.detail.map(d=> d.weight>0 ? (d.weight+'×'+(d.reps||'?')) : ((d.reps||'?')+'次自重')).join(' / ')
       : ((e.sets||'?')+'组·'+(e.reps||'?')+'次'+(e.weight?('·'+e.weight+'kg'):'（自重）'));
     const kindTag=(e.detail&&e.detail.length>1)?('<span class="ce-kind">'+setKindTag(e.detail)+'</span>'):'';
+    const pi=TRAIN_PARTS.find(x=>x.key===e.part);
     const div=document.createElement('div');div.className='ce-item'+(e.done?' on':'');
     div.innerHTML='<div class="ce-main"><span class="ce-name">'+e.name+'</span>'+kindTag+
+      (pi?'<span class="ce-part" data-i="'+i+'">'+pi.emoji+pi.name+'</span>':'')+
       '<span class="ce-meta">'+meta+'</span></div>'+
       '<div class="ce-side"><span class="ce-cal">🔥'+(e.cal||0)+'kcal</span><span class="ce-edit" data-i="'+i+'">✎</span><span class="ce-del" data-i="'+i+'">✕</span></div>'+
       (e.note?'<div class="ce-note">'+e.note+'</div>':'');
@@ -4158,6 +4162,15 @@ function renderCustomEx(){
       profile().customEx[k].splice(i,1);save();renderCustomEx();renderExLib();renderExParts();renderCalorieSummary();
       document.getElementById('exInput').focus();
       showFoodHint('✎ 已填入旧数据编辑，改完撳「添加」');
+    };
+    const partChip=div.querySelector('.ce-part');
+    if(partChip)partChip.onclick=()=>{
+      const idx=TRAIN_PARTS.findIndex(x=>x.key===e.part);
+      const next=TRAIN_PARTS[(idx+1)%TRAIN_PARTS.length];
+      e.part=next.key;
+      if(profile().exLib){const lib=profile().exLib.find(x=>x.name===e.name);if(lib)lib.part=next.key;}
+      save();renderCustomEx();renderExLib();renderExParts();renderCalorieSummary();
+      showFoodHint('已更改部位为 '+next.emoji+next.name);
     };
   });
 }

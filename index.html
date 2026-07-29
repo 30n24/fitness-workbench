@@ -634,6 +634,7 @@ html.dark .dash-card{background:#171f30}
 /* ===== AI 联网查设置 ===== */
 .meal-ai-btn{display:none;padding:0 10px;height:40px;border-radius:12px;border:1px solid var(--border);background:linear-gradient(135deg,var(--purple),var(--primary));color:#fff;font-size:12px;font-weight:700;white-space:nowrap}
 .meal-ai-btn:active{transform:scale(.95)}
+.ai-tip{font-size:12px;color:var(--muted);background:linear-gradient(135deg,rgba(91,140,255,.08),rgba(244,114,182,.06));border:1px solid var(--border);border-radius:12px;padding:8px 10px;margin:6px 2px 0;line-height:1.6}
 /* ===== 自定义动作 + AI 计卡 ===== */
 .custom-ex-card{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:14px;margin:14px 2px 0}
 .custom-ex-card .meal-row{display:flex;gap:8px;align-items:center}
@@ -893,6 +894,7 @@ html.dark .dash-card{background:#171f30}
     <div class="cf-list" id="cfList"></div>
   </div>
 
+  <div class="ai-tip">💡 冇收录嘅食物？喺输入框打名后点右侧 <b>🔍AI</b> 联网查热量（首次需到「数据管理 → 🤖 AI 查热量」填 Key）</div>
   <div class="section-title">🍳 早餐（自主输入）</div>
   <div class="meal-input-card">
     <div class="meal-row">
@@ -3524,8 +3526,8 @@ function openAiCfg(){
   m.classList.add('show');
 }
 function updateAiButtons(){
-  const has=!!getAICfg();
-  ['breakfast','lunch','dinner','ex'].forEach(k=>{const b=document.getElementById(k+'Ai');if(b)b.style.display=has?'inline-block':'none';});
+  // AI 按钮永远显示：冇 Key 嗰阵撳咗会引导去「数据管理 → 🤖 AI 查热量」填 Key
+  ['breakfast','lunch','dinner','ex'].forEach(k=>{const b=document.getElementById(k+'Ai');if(b)b.style.display='inline-block';});
 }
 async function aiLookupFood(raw,kind,inputId){
   const cfg=getAICfg();

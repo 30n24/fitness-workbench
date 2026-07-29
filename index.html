@@ -945,7 +945,6 @@ html.dark .dash-card{background:#171f30}
   </div>
   <button class="checkin-btn" id="checkinBtn">完成今日打卡</button>
   <button class="rest-btn" id="restBtn"></button>
-  <div id="recDateDbg" style="font-size:10px;color:var(--muted);text-align:center;margin:2px 0 0"></div>
 
   <div class="section-title" style="margin-top:20px">🏃 有氧运动</div>
   <div class="cardio-card">
@@ -1702,15 +1701,8 @@ function updateRecDateBar(){
   const wk=['日','一','二','三','四','五','六'];const d=curRecDate;
   const lbl=document.getElementById('rdLabel'); if(lbl)lbl.textContent=recDayLabel();
   const tb=document.getElementById('rdToday'); if(tb)tb.style.display=isRecToday()?'none':'';
-  // 修复 iOS Safari date input bug：程序设 input.value 会异步触发 change，且 this.value 仍是旧值，
-  // 会错误调 setRecDate 把 curRecDate 改回今日。先解绑 change handler 再赋值。
   const inp=document.getElementById('rdInput');
-  if(inp){
-    const prevHandler=inp.onchange;
-    inp.onchange=null;
-    inp.value=recKey();
-    inp.onchange=prevHandler;
-  }
+  // 注意：不设 inp.value 系防止 iOS Safari date input 异步 change 事件错误改 curRecDate
   const chip=document.getElementById('dateChip'); if(chip)chip.textContent=(d.getMonth()+1)+'月'+d.getDate()+'日 周'+wk[d.getDay()];
   const rb=document.getElementById('restBtn');
   if(rb){
@@ -2753,9 +2745,6 @@ function renderCheckinBtn(){
   btn.classList.toggle('done',done||rest);
   btn.classList.toggle('rest',rest);
   const lb=recDayLabel();
-  // 调试：显示当前日期key
-  const dbg=document.getElementById('recDateDbg');
-  if(dbg)dbg.textContent='key='+recKey()+' | cur.toISO='+curRecDate.toISOString().slice(0,10)+' | cur.getDate='+curRecDate.getDate()+' | today='+todayKey()+' | isToday='+isRecToday()+' | rest='+rest+' | done='+done+(!rest&&!done?' | 📝 补登记':'');
   if(isRecToday()){
     if(rest)btn.textContent='🛌 今日休息中（点此改为训练）';
     else if(done)btn.textContent='✓ 今日已打卡（点此取消）';
@@ -3858,7 +3847,7 @@ document.getElementById('rdPrev').onclick=()=>shiftRecDate(-1);
 document.getElementById('rdNext').onclick=()=>shiftRecDate(1);
 document.getElementById('rdToday').onclick=()=>resetRecDate();
 document.getElementById('rdMain').onclick=()=>{const i=document.getElementById('rdInput');if(i)i.click();};
-document.getElementById('rdInput').onchange=function(){if(!this.value)return;const p=this.value.split('-');setRecDate(+p[0],+p[1],+p[2]);};
+document.getElementById('rdInput').onchange=function(){if(!this.value||this.value===recKey())return;const p=this.value.split('-');setRecDate(+p[0],+p[1],+p[2]);};
 document.getElementById('switchUser').onclick=switchProfile;
 document.getElementById('homeBtn').onclick=backToSelect;
 // 数据导出

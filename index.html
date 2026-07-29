@@ -867,7 +867,6 @@ html.dark .dash-card{background:#171f30}
     <span class="rd-label" id="rdLabel">今日</span>
   </button>
   <button class="rd-nav" id="rdNext" aria-label="后一天">›</button>
-  <button class="rd-today" id="rdToday" style="display:none">回到今日</button>
   <input type="date" id="rdInput" class="rd-input">
 </div>
 
@@ -1679,7 +1678,7 @@ const MENUS = {
 const KEY='fitness_workbench_v2';
 let state=load();
 // 强制缓存更新：版本变化时清除所有 sw 缓存并硬刷新
-const APP_VER='14';
+const APP_VER='15';
 if(localStorage.getItem('app_ver')!==APP_VER){
   localStorage.setItem('app_ver',APP_VER);
   if('caches' in window)caches.keys().then(n=>{n.forEach(c=>{if(c.includes('fitness-workbench'))caches.delete(c);});}).then(()=>location.reload(true));
@@ -1706,7 +1705,6 @@ function setRecDate(y,m,d){curRecDate=new Date(y,m-1,d);applyRecDate();}
 function updateRecDateBar(){
   const wk=['日','一','二','三','四','五','六'];const d=curRecDate;
   const lbl=document.getElementById('rdLabel'); if(lbl)lbl.textContent=recDayLabel();
-  const tb=document.getElementById('rdToday'); if(tb)tb.style.display=isRecToday()?'none':'';
   const inp=document.getElementById('rdInput');
   // 注意：不设 inp.value 系防止 iOS Safari date input 异步 change 事件错误改 curRecDate
   const chip=document.getElementById('dateChip'); if(chip)chip.textContent=(d.getMonth()+1)+'月'+d.getDate()+'日 周'+wk[d.getDay()];
@@ -3868,7 +3866,6 @@ document.getElementById('restBtn').onclick=doRestDay;
 // 记录日期选择条（补记录用：可切到过往日期）
 document.getElementById('rdPrev').onclick=()=>shiftRecDate(-1);
 document.getElementById('rdNext').onclick=()=>shiftRecDate(1);
-document.getElementById('rdToday').onclick=()=>resetRecDate();
 document.getElementById('rdMain').onclick=()=>{const i=document.getElementById('rdInput');if(i)i.click();};
 document.getElementById('rdInput').onchange=function(){if(!this.value||this.value===recKey())return;const p=this.value.split('-');setRecDate(+p[0],+p[1],+p[2]);};
 document.getElementById('switchUser').onclick=switchProfile;

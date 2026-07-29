@@ -166,10 +166,14 @@ main{padding:14px 14px 20px;max-width:680px;margin:0 auto}
 .ex-vlink:active{transform:scale(.95)}
 /* 热量统计条 */
 .cal-bar{margin:0 2px 12px;background:linear-gradient(135deg,rgba(251,146,60,.12),rgba(244,114,182,.08));border:1px solid rgba(251,146,60,.25);border-radius:12px;padding:12px 14px;display:none}
-.cal-bar-inner{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.cal-bar-inner{display:flex;align-items:center;gap:14px;flex-wrap:wrap}
+.cal-block{display:flex;flex-direction:column;gap:2px}
 .cal-title{font-size:13px;font-weight:700;color:var(--text)}
 .cal-total{font-size:18px;font-weight:800;color:var(--orange)}
-.cal-detail{font-size:11px;color:var(--muted);width:100%}
+.cal-total.cal-burn{color:var(--green)}
+.cal-detail{font-size:11px;color:var(--muted);width:100%;margin-top:2px}
+.cal-pos{color:var(--orange)}
+.cal-neg{color:var(--green)}
 /* 有氧运动卡片 */
 .cardio-card{background:linear-gradient(135deg,rgba(34,211,238,.1),rgba(167,139,250,.05));border:1px solid rgba(34,211,238,.25);border-radius:14px;padding:14px;margin:0 2px 12px}
 .cardio-card .head{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px}
@@ -857,8 +861,14 @@ html.dark .dash-card{background:#171f30}
   </div>
   <div class="cal-bar" id="calBar">
     <div class="cal-bar-inner">
-      <div class="cal-title">🔥 今日热量</div>
-      <div class="cal-total" id="calTotal">0kcal</div>
+      <div class="cal-block">
+        <div class="cal-title">🍽 今日摄入</div>
+        <div class="cal-total" id="calTotal">0kcal</div>
+      </div>
+      <div class="cal-block">
+        <div class="cal-title">🔥 运动消耗</div>
+        <div class="cal-total cal-burn" id="calBurn">0kcal</div>
+      </div>
       <div class="cal-detail" id="calDetail"></div>
     </div>
   </div>
@@ -3131,9 +3141,17 @@ function renderCalorieSummary(){
   (profile().cardio?.[k]||[]).forEach(c=>exCal+=cardioCalOf(c));
   const bd=profile().badminton?.[k];if(bd)exCal+=bd.duration*7;
   (profile().customEx?.[k]||[]).forEach(e=>{ if(e.done!==false) exCal+=(e.cal||0); });
-  const calBar=document.getElementById('calBar'),calTotal=document.getElementById('calTotal'),calDetail=document.getElementById('calDetail');
+  const calBar=document.getElementById('calBar'),calTotal=document.getElementById('calTotal'),calBurn=document.getElementById('calBurn'),calDetail=document.getElementById('calDetail');
   if(calBar){
-    if(foodCal+exCal>0){calBar.style.display='block';calTotal.textContent=(foodCal+exCal)+'kcal';calDetail.innerHTML=`饮食 ${foodCal} · 运动消耗 ${exCal}kcal`;}
+    if(foodCal>0||exCal>0){
+      calBar.style.display='block';
+      calTotal.textContent=foodCal+'kcal';   // 饮食摄入（吃进来嘅）
+      calBurn.textContent=exCal+'kcal';       // 运动消耗（练甩嘅）
+      const net=foodCal-exCal;                // 收支净额：摄入 - 消耗（唔系相加）
+      calDetail.innerHTML = net>=0
+        ? `收支净额 <b class="cal-pos">+${net}</b>kcal（运动抵消后净摄入）`
+        : `收支净额 <b class="cal-neg">${net}</b>kcal（运动消耗超出饮食 ${-net}kcal）`;
+    }
     else calBar.style.display='none';
   }
 }

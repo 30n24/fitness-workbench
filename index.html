@@ -92,7 +92,7 @@ input,textarea{font-family:inherit}
 .topbar .left .sub{font-size:11px;color:var(--muted);margin-top:1px;display:flex;gap:6px;align-items:center;flex-wrap:wrap}
 .topbar .right{display:flex;gap:8px;align-items:center}
 .date-chip{background:var(--card);border:1px solid var(--border);padding:3px 9px;border-radius:20px;font-size:11px}
-.diet-tag{padding:3px 9px;border-radius:20px;font-size:11px;font-weight:600}
+.diet-tag{padding:3px 9px;border-radius:20px;font-size:11px;font-weight:600;background:var(--card);color:var(--muted);border:1px solid var(--border)}
 .diet-tag.low{background:rgba(52,211,153,.15);color:#34d399;border:1px solid rgba(52,211,153,.3)}
 .diet-tag.high{background:rgba(251,146,60,.15);color:#fb923c;border:1px solid rgba(251,146,60,.3)}
 /* 记录日期选择条（补记录用） */
@@ -3330,7 +3330,7 @@ function applyTheme(){
   const isDark=t==='dark'||(t==='system'&&systemDark());
   document.documentElement.classList.toggle('dark',isDark);
   const btn=document.getElementById('themeBtn');
-  if(btn){const icons={light:'☀️',dark:'🌙',system:'🔄'};btn.textContent=icons[t]||'🔄';btn.title=t==='system'?'跟随系统':(t==='dark'?'深色':'浅色');}
+  if(btn){const icons={light:'☀️',dark:'🌙',system:'🌓'};btn.textContent=icons[t]||'🌓';btn.title=t==='system'?'跟随系统':(t==='dark'?'深色':'浅色');}
 }
 function toggleTheme(){
   const cur=localStorage.getItem('fw_theme')||'system';

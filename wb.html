@@ -2427,9 +2427,15 @@ function renderStats(){
         else { const part=c.part; if(part)partDays[part]=(partDays[part]||0)+1; }
       }
     });
-    // 部位分布：聚合实际记录嘅每个动作部位（唔只睇打卡时选嘅单一部位）
+    // 部位分布：聚合实际记录嘅每个动作部位（新系统 customEx + 旧系统 exercises）
     Object.keys(data.customEx||{}).forEach(k=>{
       if(k.startsWith(mk))(data.customEx[k]||[]).forEach(e=>{ if(e.part)partDays[e.part]=(partDays[e.part]||0)+1; });
+    });
+    Object.keys(data.checkins).forEach(k=>{
+      if(k.startsWith(mk)){
+        const c=data.checkins[k];
+        if(c.exercises) Object.keys(c.exercises).forEach(pt=>{ if(pt)partDays[pt]=(partDays[pt]||0)+1; });
+      }
     });
     const trainDays=checkinDays-restDays;
     Object.keys(data.badminton).forEach(k=>{
@@ -3560,6 +3566,9 @@ function generateReport(){
   const mk=monthKey();const d=new Date();const data=profile();
   let checkinDays=0,restDays=0,partDays={};
   Object.keys(data.checkins).forEach(k=>{if(k.startsWith(mk)&&data.checkins[k].partChecked){checkinDays++;if(data.checkins[k].rest)restDays++;const p=data.checkins[k].part;if(p)partDays[p]=(partDays[p]||0)+1;}});
+  // 部位分布：聚合 customEx + 旧版 exercises
+  Object.keys(data.customEx||{}).forEach(k=>{if(k.startsWith(mk))(data.customEx[k]||[]).forEach(e=>{if(e.part)partDays[e.part]=(partDays[e.part]||0)+1;});});
+  Object.keys(data.checkins).forEach(k=>{if(k.startsWith(mk)){const c=data.checkins[k];if(c.exercises)Object.keys(c.exercises).forEach(pt=>{if(pt)partDays[pt]=(partDays[pt]||0)+1;});}});
   const trainDays=checkinDays-restDays;
   let totalCal=0;
   Object.keys(data.cardio||{}).forEach(k=>{if(k.startsWith(mk))(data.cardio[k]||[]).forEach(c=>{totalCal+=c.cal!=null?c.cal:Math.round((c.duration||0)*((CARDIO[c.type]&&CARDIO[c.type].cpm)||8));});});
@@ -3597,6 +3606,9 @@ function generateWeekReport(){
   const keys=[];for(let i=6;i>=0;i--){const x=new Date(d);x.setDate(x.getDate()-i);keys.push(`${x.getFullYear()}-${String(x.getMonth()+1).padStart(2,'0')}-${String(x.getDate()).padStart(2,'0')}`);}
   let checkinDays=0,restDays=0,partDays={};
   Object.keys(data.checkins).forEach(k=>{if(keys.includes(k)&&data.checkins[k].partChecked){checkinDays++;if(data.checkins[k].rest)restDays++;const p=data.checkins[k].part;if(p)partDays[p]=(partDays[p]||0)+1;}});
+  // 部位分布：聚合 customEx + 旧版 exercises
+  Object.keys(data.customEx||{}).forEach(k=>{if(keys.includes(k))(data.customEx[k]||[]).forEach(e=>{if(e.part)partDays[e.part]=(partDays[e.part]||0)+1;});});
+  Object.keys(data.checkins).forEach(k=>{if(keys.includes(k)){const c=data.checkins[k];if(c.exercises)Object.keys(c.exercises).forEach(pt=>{if(pt)partDays[pt]=(partDays[pt]||0)+1;});}});
   const trainDays=checkinDays-restDays;
   let totalCal=0;
   Object.keys(data.cardio||{}).forEach(k=>{if(keys.includes(k))(data.cardio[k]||[]).forEach(c=>{totalCal+=c.cal!=null?c.cal:Math.round((c.duration||0)*((CARDIO[c.type]&&CARDIO[c.type].cpm)||8));});});

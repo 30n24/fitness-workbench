@@ -198,6 +198,9 @@ main{padding:14px 14px 20px;max-width:680px;margin:0 auto}
 .checkin-btn.pA{background:linear-gradient(135deg,var(--pA),var(--primary-d));box-shadow:0 6px 18px rgba(91,140,255,.3)}
 .checkin-btn.pB{background:linear-gradient(135deg,var(--pB),#db2777);box-shadow:0 6px 18px rgba(244,114,182,.3)}
 .checkin-btn.done{background:var(--card-2);color:var(--green);box-shadow:none;border:1px solid var(--green)}
+.rest-btn{display:block;width:calc(100% - 4px);margin:0 2px 6px;padding:12px;border-radius:14px;font-size:14px;font-weight:700;transition:.2s;color:var(--text);background:var(--bg-2);border:1px solid var(--border);box-shadow:none}
+.rest-btn:active{transform:scale(.98)}
+.checkin-btn.rest{background:linear-gradient(135deg,#475569,#334155);color:#e2e8f0;box-shadow:0 6px 18px rgba(71,85,105,.3);border:none}
 
 /* 羽毛球 */
 .badminton-card{background:linear-gradient(135deg,rgba(167,139,250,.1),rgba(34,211,238,.05));border:1px solid rgba(167,139,250,.25);border-radius:14px;padding:14px;margin:0 2px 12px}
@@ -329,6 +332,8 @@ main{padding:14px 14px 20px;max-width:680px;margin:0 auto}
 .week-cell.doneB{background:linear-gradient(135deg,rgba(244,114,182,.18),rgba(244,114,182,.05));border-color:var(--pB);color:var(--pB)}
 .week-cell.doneAB{background:linear-gradient(135deg,rgba(91,140,255,.15),rgba(244,114,182,.15));border-color:var(--green);color:var(--green)}
 .week-cell.today{outline:2px solid var(--accent);outline-offset:-2px}
+.week-cell.rest{background:linear-gradient(135deg,rgba(16,185,129,.16),rgba(16,185,129,.05));border-color:var(--green);color:var(--green);opacity:.92}
+.week-cell.doneA.rest,.week-cell.doneB.rest,.week-cell.doneAB.rest{background:linear-gradient(135deg,rgba(16,185,129,.16),rgba(16,185,129,.05));border-color:var(--green);color:var(--green)}
 .week-cell .bd-dot{position:absolute;top:1px;left:2px;font-size:8px}
 .week-cell{position:relative}
 
@@ -625,6 +630,30 @@ html.dark .dash-card{background:#171f30}
 .ci-save:active{transform:scale(.97)}
 .ci-close{padding:12px 18px;border-radius:12px;background:var(--bg-2);border:1px solid var(--border);color:var(--text);font-size:14px;font-weight:600}
 .ci-close:active{transform:scale(.97)}
+/* ===== 休息日 ===== */
+.rest-overlay{position:fixed;inset:0;z-index:9991;background:rgba(15,23,42,.55);display:flex;align-items:center;justify-content:center;padding:20px;opacity:0;transition:.2s}
+.rest-overlay.show{opacity:1}
+.rest-card{background:linear-gradient(160deg,#1e293b,#0f172a);border:1px solid rgba(148,163,184,.25);border-radius:22px;max-width:340px;width:100%;padding:26px 22px;text-align:center;color:#e2e8f0;box-shadow:0 16px 50px rgba(0,0,0,.4);transform:scale(.9);transition:.25s cubic-bezier(.2,.9,.3,1.2)}
+.rest-overlay.show .rest-card{transform:scale(1)}
+.rest-card.pA{box-shadow:0 16px 50px rgba(91,140,255,.35)}
+.rest-card.pB{box-shadow:0 16px 50px rgba(244,114,182,.35)}
+.rest-moon{font-size:64px;line-height:1;animation:moonPulse 2.4s ease-in-out infinite}
+@keyframes moonPulse{0%,100%{transform:scale(1);filter:drop-shadow(0 0 0 rgba(251,191,36,0))}50%{transform:scale(1.12);filter:drop-shadow(0 0 18px rgba(251,191,36,.6))}}
+.rest-title{font-size:21px;font-weight:800;margin-top:10px}
+.rest-sub{font-size:13px;color:#94a3b8;margin-top:4px}
+.rest-bar{height:8px;border-radius:999px;background:rgba(148,163,184,.2);margin:16px 0 6px;overflow:hidden}
+.rest-bar i{display:block;height:100%;width:0;background:linear-gradient(90deg,#38bdf8,#22d3ee);border-radius:999px;animation:charge 2.2s ease-out forwards}
+@keyframes charge{from{width:0}to{width:100%}}
+.rest-zzz{position:relative;height:34px;margin-top:6px}
+.rest-zzz span{position:absolute;left:50%;font-weight:800;color:#7dd3fc;opacity:0;animation:zzz 2.4s ease-in-out infinite}
+.rest-zzz span:nth-child(1){font-size:16px;animation-delay:0s}
+.rest-zzz span:nth-child(2){font-size:20px;animation-delay:.5s}
+.rest-zzz span:nth-child(3){font-size:26px;animation-delay:1s}
+@keyframes zzz{0%{transform:translate(-50%,10px) scale(.6);opacity:0}30%{opacity:1}100%{transform:translate(20px,-26px) scale(1.1);opacity:0}}
+.rest-quote{font-size:13px;color:#cbd5e1;background:rgba(148,163,184,.12);border-radius:10px;padding:10px;margin:10px 0 16px;line-height:1.5}
+.rest-actions{display:flex;gap:8px}
+.rest-close{flex:1;padding:12px;border-radius:12px;background:linear-gradient(135deg,#22d3ee,#38bdf8);color:#06283d;font-size:14px;font-weight:700;border:none}
+.rest-close:active{transform:scale(.97)}
 /* ===== 成就徽章 ===== */
 .badge-overlay{position:fixed;inset:0;z-index:9992;background:rgba(0,0,0,.5);display:flex;align-items:flex-end;justify-content:center;padding:0;animation:fadeIn .15s ease}
 .badge-box{background:var(--card);border-radius:20px 20px 0 0;max-width:560px;width:100%;max-height:82vh;overflow:auto;padding:14px 16px calc(18px + env(safe-area-inset-bottom));box-shadow:0 -10px 40px rgba(0,0,0,.25);animation:slideUp .24s cubic-bezier(.2,.8,.2,1)}
@@ -858,6 +887,7 @@ html.dark .dash-card{background:#171f30}
     <div class="ex-lib-list" id="exLibList"></div>
   </div>
   <button class="checkin-btn" id="checkinBtn">完成今日打卡</button>
+  <button class="rest-btn" id="restBtn">🛌 今日休息</button>
 
   <div class="section-title" style="margin-top:20px">🏃 有氧运动</div>
   <div class="cardio-card">
@@ -2439,15 +2469,20 @@ function renderWeekGrid(id){
     let cls='week-cell',icon='';
     if(k===tk)cls+=' today';
     if(mode==='both'){
-      const a=state.A.checkins[k]?.partChecked, b=state.B.checkins[k]?.partChecked;
-      if(a&&b){cls+=' doneAB';icon='🤝';}
-      else if(a){cls+=' doneA';icon='🏃';}
-      else if(b){cls+=' doneB';icon='🧘';}
+      const a=state.A.checkins[k], b=state.B.checkins[k];
+      const ra=a&&a.rest, rb=b&&b.rest, ta=a&&a.partChecked, tb=b&&b.partChecked;
+      if(ra&&rb){cls+=' doneAB rest';icon='🛌';}
+      else if(ra){cls+=' doneA rest';icon='🛌';}
+      else if(rb){cls+=' doneB rest';icon='🛌';}
+      else if(ta&&tb){cls+=' doneAB';icon='🤝';}
+      else if(ta){cls+=' doneA';icon='🏃';}
+      else if(tb){cls+=' doneB';icon='🧘';}
       else if(state.A.badminton[k]||state.B.badminton[k])icon='🏸';
       else if(state.A.diet[k]||state.B.diet[k])icon='🍽';
     } else {
       const p=state[curProfile];
-      if(p.checkins[k]?.partChecked){cls+=' '+(curProfile==='A'?'doneA':'doneB');icon='💪';}
+      if(p.checkins[k]?.rest){cls+=' rest '+(curProfile==='A'?'doneA':'doneB');icon='🛌';}
+      else if(p.checkins[k]?.partChecked){cls+=' '+(curProfile==='A'?'doneA':'doneB');icon='💪';}
       else if(p.badminton[k])icon='🏸';
       else if(p.diet[k])icon='🍽';
     }
@@ -2469,7 +2504,9 @@ function daySummaryHTML(p,k){
   const color=p==='A'?'var(--pA)':'var(--pB)';
   const c=pData.checkins[k];
   let rows='';
-  if(c&&c.partChecked){
+  if(c&&c.rest){
+    rows+=`<div class="dp-row"><span>💪 训练</span><span class="dv" style="color:var(--green)">🛌 休息日 · 充能中</span></div>`;
+  } else if(c&&c.partChecked){
     const parts=p==='A'?PARTS_A:PARTS_B;
     const pi=parts.find(x=>x.key===c.part);
     let done=0;
@@ -2528,14 +2565,19 @@ function renderAll(){
 function renderCheckinBtn(){
   const btn=document.getElementById('checkinBtn');if(!btn)return;
   const ck=profile().checkins[recKey()];
-  const done=!!(ck&&ck.partChecked);
-  btn.classList.toggle('done',done);
-  btn.textContent=done?'✓ 今日已打卡（点此取消）':'完成今日打卡';
+  const rest=!!(ck&&ck.rest);
+  const done=!!(ck&&ck.partChecked&&!rest);
+  btn.classList.toggle('done',done||rest);
+  btn.classList.toggle('rest',rest);
+  if(rest)btn.textContent='🛌 今日休息中（点此改为训练）';
+  else if(done)btn.textContent='✓ 今日已打卡（点此取消）';
+  else btn.textContent='完成今日打卡';
   btn.classList.remove('pA','pB');btn.classList.add(curProfile==='A'?'pA':'pB');
 }
 function doCheckin(){
   const k=recKey();
   const t=profile().checkins[k]||{part:null,exercises:{}};
+  if(t.rest){ t.rest=false; t.partChecked=false; /* 由休息切换为训练打卡 */ }
   if(t.partChecked){
     t.partChecked=false;save();renderAll();showFoodHint('已取消今日打卡');return;
   }
@@ -2552,9 +2594,38 @@ function doCheckin(){
     showCheckinCard(sum);
   }
 }
+function doRestDay(){
+  const k=recKey();
+  const t=profile().checkins[k]||{part:null,exercises:{}};
+  if(t.rest){ t.rest=false;t.partChecked=false;profile().checkins[k]=t;save();renderAll();showFoodHint('已取消休息日');return; }
+  t.rest=true;t.partChecked=true;t.part=null;t.exercises={};
+  profile().checkins[k]=t;save();renderAll();refreshBadges();
+  showRestCard(k);
+}
+function pickRestQuote(){
+  const q=['肌肉喺休息时先真正生长 💤','今日嘅躺平，系为咗听日更猛 🌿','Recovery is training too 🔋','身体喺悄悄变强，瞓多啲 🌙','休息唔系偷懒，系战略 😌'];
+  return q[Math.floor(Math.random()*q.length)];
+}
+function showRestCard(k){
+  const ov=document.createElement('div');ov.className='rest-overlay';
+  ov.innerHTML=`<div class="rest-card ${curProfile==='A'?'pA':'pB'}">
+    <div class="rest-moon">🌙</div>
+    <div class="rest-title">好好休息，充能中…</div>
+    <div class="rest-sub">身体正喺悄悄变强</div>
+    <div class="rest-bar"><i></i></div>
+    <div class="rest-zzz"><span>Z</span><span>Z</span><span>Z</span></div>
+    <div class="rest-quote">${pickRestQuote()}</div>
+    <div class="rest-actions"><button class="rest-close">继续</button></div>
+  </div>`;
+  document.body.appendChild(ov);
+  ov.querySelector('.rest-close').onclick=()=>ov.remove();
+  setTimeout(()=>ov.classList.add('show'),10);
+}
 /* 计算某日训练完成度与总容量 */
 function getCheckinSummary(k){
   const p=profile();
+  const rc=profile().checkins[k];
+  if(rc&&rc.rest)return {key:k,mode:'rest',partName:'休息日',emoji:'🌙',doneCount:0,totalCount:0,volume:0,cal:0,parts:[]};
   const list=(p.customEx?.[k]||[]);
   if(list.length){
     let volume=0,cal=0; const cnt={};
@@ -3415,6 +3486,7 @@ document.getElementById('chkHigh').addEventListener('change',e=>{
 document.querySelectorAll('.tabbar button').forEach(b=>{b.onclick=()=>switchPage(b.dataset.page)});
 // 完成今日打卡
 document.getElementById('checkinBtn').onclick=doCheckin;
+document.getElementById('restBtn').onclick=doRestDay;
 // 记录日期选择条（补记录用：可切到过往日期）
 document.getElementById('rdPrev').onclick=()=>shiftRecDate(-1);
 document.getElementById('rdNext').onclick=()=>shiftRecDate(1);

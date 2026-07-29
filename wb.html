@@ -550,16 +550,16 @@ html.dark input[type="search"]{background:var(--bg-2)}
 .report-btn{display:inline-flex;align-items:center;gap:6px;padding:9px 16px;border-radius:10px;background:linear-gradient(135deg,var(--primary),var(--accent));color:#fff;font-size:13px;font-weight:600;cursor:pointer;transition:.18s}
 .report-btn:active{transform:scale(.96)}
 .report-overlay{position:fixed;inset:0;z-index:9998;background:rgba(0,0,0,.5);display:flex;align-items:center;justify-content:center;padding:16px;overflow:auto}
-.report-card{background:var(--card);border-radius:18px;max-width:400px;width:100%;padding:20px;box-shadow:0 8px 30px rgba(0,0,0,.25)}
-.report-card .rc-head{text-align:center;margin-bottom:14px}
+.report-card{background:var(--card);border-radius:18px;max-width:400px;width:100%;padding:24px;box-shadow:0 8px 30px rgba(0,0,0,.25)}
+.report-card .rc-head{text-align:center;margin-bottom:16px}
 .report-card .rc-head .rc-name{font-size:18px;font-weight:800}
-.report-card .rc-head .rc-sub{font-size:12px;color:var(--muted);margin-top:2px}
-.report-card .rc-stat{display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border);font-size:14px}
+.report-card .rc-head .rc-sub{font-size:13px;color:var(--muted);margin-top:4px}
+.report-card .rc-stat{display:flex;justify-content:space-between;padding:10px 2px;border-bottom:1px solid var(--border);font-size:15px}
 .report-card .rc-stat:last-child{border-bottom:none}
 .report-card .rc-stat .rk{color:var(--muted)}
 .report-card .rc-stat .rv{font-weight:700}
-.report-card .rc-canvas{width:100%;height:160px;display:block;margin:12px 0}
-.report-card .rc-close{margin-top:14px;width:100%;padding:12px;border-radius:12px;background:var(--bg-2);border:1px solid var(--border);font-size:14px;font-weight:600;color:var(--text);text-align:center;cursor:pointer}
+.report-card .rc-canvas{width:100%;height:200px;display:block;margin:14px 0}
+.report-card .rc-close{margin-top:16px;width:100%;padding:13px;border-radius:12px;background:var(--bg-2);border:1px solid var(--border);font-size:15px;font-weight:600;color:var(--text);text-align:center;cursor:pointer}
 
 /* 同步状态小图标 */
 .sync-dot{display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:600;padding:4px 9px;border-radius:999px;background:var(--bg-2);border:1px solid var(--border);color:var(--muted);cursor:pointer;transition:.2s;white-space:nowrap;line-height:1}
@@ -3574,6 +3574,7 @@ function generateReport(){
   let totalCal=0;
   Object.keys(data.cardio||{}).forEach(k=>{if(k.startsWith(mk))(data.cardio[k]||[]).forEach(c=>{totalCal+=c.cal!=null?c.cal:Math.round((c.duration||0)*((CARDIO[c.type]&&CARDIO[c.type].cpm)||8));});});
   Object.keys(data.badminton||{}).forEach(k=>{if(k.startsWith(mk))totalCal+=(data.badminton[k].duration||0)*7;});
+  Object.keys(data.customEx||{}).forEach(k=>{if(k.startsWith(mk))(data.customEx[k]||[]).forEach(e=>{totalCal+=(e.cal||0);});});
   const bkeys=Object.keys(data.body||{}).sort();
   const bw0=bkeys.length?data.body[bkeys[0]].weight:null;
   const bw1=bkeys.length?data.body[bkeys[bkeys.length-1]].weight:null;
@@ -3614,6 +3615,7 @@ function generateWeekReport(){
   let totalCal=0;
   Object.keys(data.cardio||{}).forEach(k=>{if(keys.includes(k))(data.cardio[k]||[]).forEach(c=>{totalCal+=c.cal!=null?c.cal:Math.round((c.duration||0)*((CARDIO[c.type]&&CARDIO[c.type].cpm)||8));});});
   Object.keys(data.badminton||{}).forEach(k=>{if(keys.includes(k))totalCal+=(data.badminton[k].duration||0)*7;});
+  Object.keys(data.customEx||{}).forEach(k=>{if(keys.includes(k))(data.customEx[k]||[]).forEach(e=>{totalCal+=(e.cal||0);});});
   const rate=Math.round(checkinDays/7*100);
   const overlay=document.createElement('div');overlay.className='report-overlay';
   overlay.onclick=e=>{if(e.target===overlay)overlay.remove();};
@@ -3656,8 +3658,9 @@ function drawPartBars(canvas,partDays){
     // bar fill
     const colors=['#5b8cff','#22d3ee','#34d399','#f472b6','#a78bfa'];
     ctx.fillStyle=colors[i%colors.length];ctx.beginPath();ctx.roundRect(left,y,w,barH,5);ctx.fill();
-    // value
-    ctx.fillStyle='#fff';ctx.textAlign='left';ctx.fillText(v+'天',left+w+6,y+barH/2);
+    // value：阔条时文字放条内靠右，窄条时放条外靠左（确保不超 canvas）
+    if(w>50){ctx.textAlign='right';ctx.fillStyle='rgba(255,255,255,.8)';ctx.fillText(v+'天',left+w-6,y+barH/2);}
+    else{ctx.textAlign='left';ctx.fillStyle='#fff';ctx.fillText(v+'天',Math.min(left+w+6, W-right-20),y+barH/2);}
   });
 }
 

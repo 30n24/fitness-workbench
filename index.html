@@ -475,6 +475,17 @@ html.dark input,html.dark textarea,html.dark select{color:var(--text)}
 .body-chart-card canvas{width:100%;height:200px;display:block}
 .body-history{margin:0 2px}
 .body-history .bh-row{display:flex;align-items:center;justify-content:space-between;padding:8px 12px;background:var(--card);border:1px solid var(--border);border-radius:10px;margin-bottom:6px;font-size:13px}
+/* 代谢参数卡片 */
+.meta-card{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:14px;margin:0 2px 12px}
+.meta-card .row{display:flex;gap:8px;margin-bottom:8px;flex-wrap:wrap}
+.meta-card input{background:var(--bg-2);border:1px solid var(--border);border-radius:10px;padding:10px 12px;color:var(--text);font-size:14px;outline:none;flex:1;min-width:0}
+.meta-card input:focus{border-color:var(--primary)}
+.meta-sel{background:var(--bg-2);border:1px solid var(--border);border-radius:10px;padding:10px 12px;color:var(--text);font-size:14px;outline:none;flex:1;min-width:0}
+.meta-sel:focus{border-color:var(--primary)}
+.meta-activity-ref{font-size:11px;color:var(--muted);background:var(--bg-2);border-radius:8px;padding:7px 10px;margin-bottom:8px;line-height:1.4}
+.meta-preview{font-size:13px;color:var(--text);margin-bottom:10px;line-height:1.5}
+.meta-preview b{color:var(--orange);font-weight:800}
+.meta-preview .mp-tip{color:var(--muted);font-size:12px}
 
 /* ===== 自定义食物 ===== */
 .custom-food{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:12px 14px;margin:0 2px 12px}
@@ -1040,6 +1051,26 @@ html.dark .dash-card{background:#171f30}
       <input type="number" id="bodyHip" placeholder="臀围 cm（选填）" min="0" step="0.1">
     </div>
     <button class="save-btn" id="bodySave">记录今日</button>
+  </div>
+  <div class="section-title">🧮 代谢参数 <span class="hint">算真正热量缺口用</span></div>
+  <div class="meta-card">
+    <div class="row">
+      <select id="metaSex" class="meta-sel">
+        <option value="">性别</option>
+        <option value="male">男</option>
+        <option value="female">女</option>
+      </select>
+      <input type="number" id="metaAge" placeholder="年龄 岁" min="0" max="120" step="1">
+    </div>
+    <div class="row">
+      <input type="number" id="metaHeight" placeholder="身高 cm" min="0" max="250" step="0.1">
+      <select id="metaActivity" class="meta-sel">
+        <option value="">日常活动水平</option>
+      </select>
+    </div>
+    <div class="meta-activity-ref" id="metaActivityRef">选咗活动水平会显示参考说明</div>
+    <div class="meta-preview" id="metaPreview"></div>
+    <button class="save-btn" id="metaSave">保存代谢参数</button>
   </div>
   <div class="body-latest" id="bodyLatest"></div>
   <div class="section-title">📉 体重趋势</div>
@@ -1809,6 +1840,27 @@ function latestWeight(p){
   const tk=todayKey();let best=null;
   keys.forEach(k=>{if(k<=tk)best=k;});
   return best?body[best].weight:null;
+}
+/* ===== 代谢参数：算真正热量缺口（BMR/TDEE） ===== */
+const ACTIVITY_LEVELS=[
+  {key:1.2,   name:'久坐',   ref:'几乎唔郁，返工成日坐 / 司机 / 居家'},
+  {key:1.375, name:'轻度',   ref:'每周轻运动 1–3 次（散步、拉伸）'},
+  {key:1.55,  name:'中度',   ref:'每周中强度 3–5 次（慢跑、力量训练）'},
+  {key:1.725, name:'高度',   ref:'每周高强度 6–7 次 / 体力劳动'},
+  {key:1.9,   name:'极高',   ref:'体力劳动 + 每日都练'}
+];
+function bmrOf(p){
+  const w=latestWeight(p); if(w==null)return null;
+  const m=state[p].meta||{};
+  if(!m.sex||!m.age||!m.height)return null;
+  const base=10*w+6.25*m.height-5*m.age;
+  return Math.round(m.sex==='female'? base-161 : base+5); // Mifflin-St Jeor
+}
+function tdeeOf(p){
+  const b=bmrOf(p); if(b==null)return null;
+  const m=state[p].meta||{};
+  if(!m.activity)return null;
+  return Math.round(b*m.activity);
 }
 function renderHomeDash(){
   const el=document.getElementById('homeDash');if(!el)return;
@@ -2805,7 +2857,7 @@ function switchPage(p){
     if(b.dataset.page===p){b.classList.add('active');b.classList.add(curProfile==='A'?'pA':'pB')}
   });
   if(p==='diet'){renderDiet();renderCustomFood();}
-  if(p==='body')renderBody();
+  if(p==='body'){renderBody();renderMeta();}
   if(p==='stats')renderStats();
   if(p==='expenses')renderExpenses();
   if(p==='photos')renderPhotos();
@@ -3142,15 +3194,21 @@ function renderCalorieSummary(){
   const bd=profile().badminton?.[k];if(bd)exCal+=bd.duration*7;
   (profile().customEx?.[k]||[]).forEach(e=>{ if(e.done!==false) exCal+=(e.cal||0); });
   const calBar=document.getElementById('calBar'),calTotal=document.getElementById('calTotal'),calBurn=document.getElementById('calBurn'),calDetail=document.getElementById('calDetail');
+  const tdee=tdeeOf(curProfile); // 每日总消耗（含活动系数）；未填代谢参数则为 null
   if(calBar){
-    if(foodCal>0||exCal>0){
+    if(foodCal>0||exCal>0||tdee!=null){
       calBar.style.display='block';
       calTotal.textContent=foodCal+'kcal';   // 饮食摄入（吃进来嘅）
-      calBurn.textContent=exCal+'kcal';       // 运动消耗（练甩嘅）
-      const net=foodCal-exCal;                // 收支净额：摄入 - 消耗（唔系相加）
-      calDetail.innerHTML = net>=0
-        ? `收支净额 <b class="cal-pos">+${net}</b>kcal（运动抵消后净摄入）`
-        : `收支净额 <b class="cal-neg">${net}</b>kcal（运动消耗超出饮食 ${-net}kcal）`;
+      calBurn.textContent=exCal+'kcal';       // 运动消耗（记录值，仅参考）
+      if(tdee!=null){
+        const def=tdee-foodCal;               // 真正热量缺口 = 总消耗 − 摄入
+        const cls=def>0?'cal-neg':'cal-pos';  // 缺口达标(绿) / 盈余(橙)
+        const tag=def>0?('缺口达标 '+(-def)+'kcal'):('高于消耗，盈余 '+(def*-1)+'kcal');
+        calDetail.innerHTML=`📊 每日总消耗 <b>${tdee}</b>kcal · 📉 热量缺口 <b class="${cls}">${def>0?def:(-def)}</b>kcal <span class="${cls}">（${tag}）</span>`;
+      } else {
+        const net=foodCal-exCal;
+        calDetail.innerHTML=`运动消耗(记录) ${exCal}kcal · 净额 ${net>=0?'+':''}${net}kcal <span style="color:var(--muted)">· 去身体页填代谢参数算真正缺口</span>`;
+      }
     }
     else calBar.style.display='none';
   }
@@ -3285,6 +3343,38 @@ function saveBody(){
     hip:parseFloat(document.getElementById('bodyHip').value)||undefined
   };
   save();renderBody();showFoodHint('✅ 已记录今日身体数据');
+}
+/* 代谢参数：活动水平选项 + 渲染 + 预览 + 保存 */
+function initMetaSelects(){
+  const sel=document.getElementById('metaActivity');if(!sel)return;
+  if(sel.options.length<=1){
+    ACTIVITY_LEVELS.forEach(a=>{const o=document.createElement('option');o.value=a.key;o.textContent=a.name+'（×'+a.key+'）';sel.appendChild(o);});
+  }
+}
+function renderMeta(){
+  const m=state[curProfile].meta||{};
+  const sex=document.getElementById('metaSex'),age=document.getElementById('metaAge'),h=document.getElementById('metaHeight'),act=document.getElementById('metaActivity'),ref=document.getElementById('metaActivityRef');
+  if(sex)sex.value=m.sex||'';
+  if(age)age.value=m.age||'';
+  if(h)h.value=m.height||'';
+  if(act){initMetaSelects();act.value=m.activity||'';}
+  if(ref){const a=ACTIVITY_LEVELS.find(x=>+x.key===+m.activity);ref.textContent=a?a.ref:'选咗活动水平会显示参考说明';}
+  updateMetaPreview();
+}
+function updateMetaPreview(){
+  const pv=document.getElementById('metaPreview');if(!pv)return;
+  const b=bmrOf(curProfile),t=tdeeOf(curProfile);
+  if(b==null){pv.innerHTML='<span class="mp-tip">填齐 性别 / 年龄 / 身高 / 活动水平 即显示 BMR 同每日总消耗</span>';return;}
+  pv.innerHTML='预计基础代谢 <b>'+b+'</b>kcal · 每日总消耗 <b>'+t+'</b>kcal';
+}
+function saveMeta(){
+  const sex=document.getElementById('metaSex').value;
+  const age=parseFloat(document.getElementById('metaAge').value);
+  const height=parseFloat(document.getElementById('metaHeight').value);
+  const activity=document.getElementById('metaActivity').value;
+  if(!sex||!age||!height||!activity){showFoodHint('请填齐 性别 / 年龄 / 身高 / 活动水平');return;}
+  state[curProfile].meta={sex,age,height,activity:parseFloat(activity)};
+  save();renderMeta();renderCalorieSummary();showFoodHint('✅ 已保存代谢参数');
 }
 
 /* 折线图通用绘制 */
@@ -3997,6 +4087,8 @@ document.getElementById('cfSaveBtn').onclick=()=>{
 };
 // 身体数据
 document.getElementById('bodySave').onclick=saveBody;
+document.getElementById('metaSave').onclick=saveMeta;
+document.getElementById('metaActivity')&&(document.getElementById('metaActivity').onchange=()=>{const a=ACTIVITY_LEVELS.find(x=>+x.key===+document.getElementById('metaActivity').value);const ref=document.getElementById('metaActivityRef');if(ref)ref.textContent=a?a.ref:'选咗活动水平会显示参考说明';});
 // 月度报告
 document.getElementById('reportBtn').onclick=generateReport;
 // 成就徽章

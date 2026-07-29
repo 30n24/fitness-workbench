@@ -732,7 +732,8 @@ html.dark .dash-card{background:#171f30}
 .ce-kind{font-size:10px;font-weight:700;color:#fff;background:linear-gradient(135deg,#8b5cf6,#6366f1);border-radius:999px;padding:1px 7px;margin-left:2px}
 .ce-side{display:flex;align-items:center;gap:10px;flex-shrink:0}
 .ce-cal{font-size:12px;font-weight:700;color:var(--pink,#ec4899)}
-.ce-del{font-size:14px;color:var(--muted);cursor:pointer;padding:2px 4px}
+.ce-del{font-size:15px;color:#ef4444;cursor:pointer;padding:5px 8px;border-radius:9px;background:rgba(239,68,68,.10);line-height:1;transition:.15s;flex-shrink:0}
+.ce-del:active{background:rgba(239,68,68,.24)}
 .ce-note{font-size:11px;color:var(--muted);margin-top:2px}
 .ai-modal{position:fixed;inset:0;z-index:9993;background:rgba(0,0,0,.5);display:none;align-items:center;justify-content:center;padding:18px;animation:fadeIn .15s ease}
 .ai-modal.show{display:flex}
@@ -4010,7 +4011,10 @@ function renderCustomEx(){
       '<div class="ce-side"><span class="ce-cal">🔥'+(e.cal||0)+'kcal</span><span class="ce-del" data-i="'+i+'">✕</span></div>'+
       (e.note?'<div class="ce-note">'+e.note+'</div>':'');
     el.appendChild(div);
-    div.querySelector('.ce-del').onclick=()=>{profile().customEx[k].splice(i,1);save();renderCustomEx();renderCalorieSummary();if(curPage==='stats')renderStats();};
+    div.querySelector('.ce-del').onclick=()=>{
+      if(!confirm('删除「'+e.name+'」呢个动作？'))return;
+      profile().customEx[k].splice(i,1);save();renderCustomEx();renderExLib();renderExParts();renderCalorieSummary();if(curPage==='stats')renderStats();
+    };
   });
 }
 async function aiLookupExercise(raw,inputId){

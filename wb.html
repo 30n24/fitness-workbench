@@ -1678,6 +1678,12 @@ const MENUS = {
 /* ===== 状态 ===== */
 const KEY='fitness_workbench_v2';
 let state=load();
+// 强制缓存更新：版本变化时清除所有 sw 缓存并硬刷新
+const APP_VER='14';
+if(localStorage.getItem('app_ver')!==APP_VER){
+  localStorage.setItem('app_ver',APP_VER);
+  if('caches' in window)caches.keys().then(n=>{n.forEach(c=>{if(c.includes('fitness-workbench'))caches.delete(c);});}).then(()=>location.reload(true));
+}
 let curProfile='A';
 let curPart='chest';
 let partsExpanded=false; // 部位栏：休息日始终显示；超出5个嘅其他部位先收进「更多」

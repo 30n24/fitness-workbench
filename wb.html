@@ -3337,11 +3337,17 @@ function toggleTheme(){
   showFoodHint(next==='dark'?'已切换深色模式':'已切换浅色模式');
 }
 
-/* 饮水（目标按体重×35ml÷250ml/杯，最低 4 杯；无体重回退 8） */
+/* 饮水目标（科学公式：体重×性别系数×活动校正，转杯/250ml）
+   男 35ml/kg · 女 30ml/kg · 未知 33ml/kg；久坐1.2为基准，活动每高一档+15% */
 function waterGoal(){
   const w=latestWeight(curProfile);
   if(w==null)return 8;
-  return Math.max(4, Math.round(w*0.14));
+  const meta=state[curProfile].meta||{};
+  const basePerKg = meta.sex==='female' ? 30 : (meta.sex==='male' ? 35 : 33);
+  let ml = w * basePerKg;
+  const act = meta.activity || 1.2;
+  if(act>1.2) ml *= (1 + 0.15 * (act - 1.2));
+  return Math.max(4, Math.round(ml / 250));
 }
 function renderWater(){
   const k=recKey();

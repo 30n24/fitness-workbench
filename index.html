@@ -694,6 +694,7 @@ html.dark .dash-card{background:#171f30}
 .ce-main{display:flex;flex-direction:column;gap:2px;min-width:0}
 .ce-name{font-size:14px;font-weight:700}
 .ce-meta{font-size:11px;color:var(--muted)}
+.ce-kind{font-size:10px;font-weight:700;color:#fff;background:linear-gradient(135deg,#8b5cf6,#6366f1);border-radius:999px;padding:1px 7px;margin-left:2px}
 .ce-side{display:flex;align-items:center;gap:10px;flex-shrink:0}
 .ce-cal{font-size:12px;font-weight:700;color:var(--pink,#ec4899)}
 .ce-del{font-size:14px;color:var(--muted);cursor:pointer;padding:2px 4px}
@@ -1708,6 +1709,7 @@ async function syncPull(){
 }
 async function doSync(pushProfile, notify){
   if(!cloudReady())return;
+  if(location.search.includes('nosync'))return;
   if(_syncing){_dirty=true;return;}
   _syncing=true;setSyncStatus('syncing');
   try{
@@ -1720,7 +1722,7 @@ async function doSync(pushProfile, notify){
   }catch(e){console.warn('sync fail',e);setSyncStatus('err');if(notify)showFoodHint('☁ 同步失败，请检查网络');}
   finally{_syncing=false;if(_dirty){_dirty=false;doSync(pushProfile,notify);}}
 }
-function triggerSync(){ if(cloudReady())doSync(curProfile, false); }
+function triggerSync(){ if(cloudReady() && !location.search.includes('nosync'))doSync(curProfile, false); }
 function isTyping(){const a=document.activeElement;return a&&(a.tagName==='INPUT'||a.tagName==='TEXTAREA')}
 function setSyncStatus(s){
   const el=document.getElementById('syncDot');
@@ -2299,14 +2301,16 @@ function renderStats(){
   ['A','B'].forEach(p=>{
     const data=state[p];
     // 统计本月打卡
-    let checkinDays=0,partDays={},bdDays=0,bdMins=0,lowDays=0,highDays=0,cardioDays=0,cardioMins=0,totalCal=0;
+    let checkinDays=0,restDays=0,partDays={},bdDays=0,bdMins=0,lowDays=0,highDays=0,cardioDays=0,cardioMins=0,totalCal=0;
     Object.keys(data.checkins).forEach(k=>{
-      if(k.startsWith(mk)&&data.checkins[k].partChecked){
+      const c=data.checkins[k];
+      if(k.startsWith(mk)&&c.partChecked){
         checkinDays++;
-        const part=data.checkins[k].part;
-        if(part)partDays[part]=(partDays[part]||0)+1;
+        if(c.rest)restDays++;
+        else { const part=c.part; if(part)partDays[part]=(partDays[part]||0)+1; }
       }
     });
+    const trainDays=checkinDays-restDays;
     Object.keys(data.badminton).forEach(k=>{
       if(k.startsWith(mk)){bdDays++;bdMins+=data.badminton[k].duration||0;totalCal+=(data.badminton[k].duration||0)*7}
     });
@@ -2337,7 +2341,9 @@ function renderStats(){
       : '<div class="ov-stat"><span class="k">暂无数据</span><span class="v">—</span></div>';
 
     card.innerHTML=`<div class="ov-head"><div class="av">${emoji}</div><div><div class="n">${name}</div><div class="g">${p==='A'?'碳循环增肌':'塑形练薄'}</div></div></div>
-      <div class="ov-stat"><span class="k">📅 本月打卡</span><span class="v">${checkinDays}/${daysInMonth}天</span></div>
+      <div class="ov-stat"><span class="k">📅 本月训练</span><span class="v">${trainDays}天</span></div>
+      <div class="ov-stat"><span class="k">🛌 休息日</span><span class="v">${restDays}天</span></div>
+      <div class="ov-stat"><span class="k">📆 活跃合计</span><span class="v">${checkinDays}/${daysInMonth}天</span></div>
       <div class="ov-stat"><span class="k">🏸 羽毛球</span><span class="v">${bdDays}次 / ${bdMins}分钟</span></div>
       <div class="ov-stat"><span class="k">🏃 有氧运动</span><span class="v">${cardioDays}次 / ${cardioMins}分钟</span></div>
       <div class="ov-stat"><span class="k">🔥 预估消耗</span><span class="v">${totalCal}kcal</span></div>
@@ -3330,8 +3336,9 @@ function showProgressChart(en){
 /* 月度报告 */
 function generateReport(){
   const mk=monthKey();const d=new Date();const data=profile();
-  let checkinDays=0,partDays={};
-  Object.keys(data.checkins).forEach(k=>{if(k.startsWith(mk)&&data.checkins[k].partChecked){checkinDays++;const p=data.checkins[k].part;if(p)partDays[p]=(partDays[p]||0)+1;}});
+  let checkinDays=0,restDays=0,partDays={};
+  Object.keys(data.checkins).forEach(k=>{if(k.startsWith(mk)&&data.checkins[k].partChecked){checkinDays++;if(data.checkins[k].rest)restDays++;const p=data.checkins[k].part;if(p)partDays[p]=(partDays[p]||0)+1;}});
+  const trainDays=checkinDays-restDays;
   let totalCal=0;
   Object.keys(data.cardio||{}).forEach(k=>{if(k.startsWith(mk))(data.cardio[k]||[]).forEach(c=>{totalCal+=c.cal!=null?c.cal:Math.round((c.duration||0)*((CARDIO[c.type]&&CARDIO[c.type].cpm)||8));});});
   Object.keys(data.badminton||{}).forEach(k=>{if(k.startsWith(mk))totalCal+=(data.badminton[k].duration||0)*7;});
@@ -3343,8 +3350,9 @@ function generateReport(){
   const overlay=document.createElement('div');overlay.className='report-overlay';
   overlay.onclick=e=>{if(e.target===overlay)overlay.remove();};
   overlay.innerHTML=`<div class="report-card">
-    <div class="rc-head"><div class="rc-name">${getPName()} · ${d.getMonth()+1}月报告</div><div class="rc-sub">${checkinDays}天打卡 · 完成率${rate}%</div></div>
-    <div class="rc-stat"><span class="rk">📅 本月训练</span><span class="rv">${checkinDays}天</span></div>
+    <div class="rc-head"><div class="rc-name">${getPName()} · ${d.getMonth()+1}月报告</div><div class="rc-sub">训练${trainDays}天 · 休息${restDays}天 · 完成率${rate}%</div></div>
+    <div class="rc-stat"><span class="rk">📅 本月训练</span><span class="rv">${trainDays}天</span></div>
+    <div class="rc-stat"><span class="rk">🛌 休息日</span><span class="rv">${restDays}天</span></div>
     <div class="rc-stat"><span class="rk">🔥 运动消耗</span><span class="rv">${totalCal}kcal</span></div>
     <div class="rc-stat"><span class="rk">⚖️ 体重变化</span><span class="rv">${bw0&&bw1?(bw1-bw0>=0?'+':'')+(bw1-bw0).toFixed(1)+'kg':'—'}</span></div>
     <canvas class="rc-canvas" id="rcCanvas"></canvas>
@@ -3686,23 +3694,56 @@ async function aiLookupFood(raw,kind,inputId){
 /* ===== 自定义动作 + AI 辅助计卡（类比食物记录） ===== */
 function parseExPerf(text){
   let s=(''+text).replace(/，/g,',')
+  const sep=/[、/→\-]|->/;
+  let wSeq=null,rSeq=null;
+  // 重量序列：60/50/40/30kg 或 20→30→40kg（捕获完整序列，而非末一对）
+  const wm=s.match(/((?:\d+(?:\.\d+)?(?:[、/→\-]|->))+\d+(?:\.\d+)?)\s*(kg|公斤|千克|磅|jin|斤)/i);
+  if(wm){ wSeq=wm[1].split(sep).map(Number); s=s.replace(wm[0],' '); }
+  // 次数序列：12/10/8/6次
+  const rm=s.match(/((?:\d+(?:\.\d+)?(?:[、/→\-]|->))+\d+(?:\.\d+)?)\s*次/i);
+  if(rm){ rSeq=rm[1].split(sep).map(Number); s=s.replace(rm[0],' '); }
   let weight=null;
-  const wm=s.match(/(\d+(?:\.\d+)?)\s*(?:kg|公斤|千克|磅|jin|斤)/i);
-  if(wm){weight=parseFloat(wm[1]); if(/磅/i.test(wm[0]))weight*=0.4536; s=s.replace(wm[0],' ');}
+  const wm2=s.match(/(\d+(?:\.\d+)?)\s*(?:kg|公斤|千克|磅|jin|斤)/i);
+  if(wm2){weight=parseFloat(wm2[1]); if(/磅/i.test(wm2[0]))weight*=0.4536; s=s.replace(wm2[0],' ');}
+  if(wSeq&&wSeq.length)weight=wSeq[wSeq.length-1];
   let sets=null,reps=null;
   const chain=s.match(/(\d+)\s*[x×X*]\s*(\d+)\s*[x×X*]\s*(\d+)/);
   if(chain){if(sets==null)sets=parseInt(chain[1]);reps=parseInt(chain[2]);if(weight==null)weight=parseFloat(chain[3]);}
   const sm=s.match(/(\d+)\s*组/); if(sm&&sets==null)sets=parseInt(sm[1]);
-  const rm=s.match(/(\d+)\s*次/); if(rm&&reps==null)reps=parseInt(rm[1]);
-  let name=s.replace(/[\dx×X*组次kg公斤千克磅jin斤]+/gi,'').replace(/[，,。.、]/g,'').replace(/\s+/g,'').trim();
+  const rm2=s.match(/(\d+)\s*次/); if(rm2&&reps==null)reps=parseInt(rm2[1]);
+  let detail=null;
+  if(wSeq||rSeq){
+    const n=Math.max(wSeq?wSeq.length:0, rSeq?rSeq.length:0, sets||0);
+    detail=[];
+    for(let i=0;i<n;i++) detail.push({weight: wSeq?(wSeq[i]!=null?wSeq[i]:wSeq[wSeq.length-1]):weight, reps: rSeq?(rSeq[i]!=null?rSeq[i]:rSeq[rSeq.length-1]):reps});
+    if(sets==null)sets=n; if(reps==null)reps=(rSeq?rSeq[rSeq.length-1]:10); if(weight==null)weight=0;
+  }
+  let name=s.replace(/[\dx×X*组次kg公斤千克磅jin斤]+/gi,'').replace(/[，,。.、/→\-]/g,'').replace(/(递减|递增|金字塔)/g,'').replace(/\s+/g,'').trim();
   if(!name)name=(''+text).replace(/[\dx×X*]+/g,'').replace(/(组|次|kg|公斤|千克|磅)+/gi,'').replace(/\s+/g,'').trim()||(''+text).trim();
   if(sets==null)sets=3; if(reps==null)reps=10;
-  return {name,sets,reps,weight};
+  return {name,sets,reps,weight,detail};
 }
 function estExCal(sets,reps,weight){
   const bw=latestWeight(curProfile)||60;
   if(weight&&weight>0) return Math.round(sets*reps*(0.045*weight+0.03*bw));
   return Math.round(sets*reps*0.045*bw);
+}
+function estExCalFromDetail(detail){
+  const bw=latestWeight(curProfile)||60;
+  let total=0;
+  (detail||[]).forEach(d=>{ const w=d.weight||0,r=d.reps||0; total += (w>0? (r*(0.045*w+0.03*bw)) : (r*0.045*bw)); });
+  return Math.round(total);
+}
+function setKindTag(detail){
+  const ws=detail.map(d=>d.weight||0);
+  let peak=0; for(let i=0;i<ws.length;i++) if(ws[i]>ws[peak])peak=i;
+  const inc=ws.every((v,i)=>i===0||v>=ws[i-1])&&ws.some((v,i)=>i>0&&v>ws[i-1]);
+  const dec=ws.every((v,i)=>i===0||v<=ws[i-1])&&ws.some((v,i)=>i>0&&v<ws[i-1]);
+  const upThenDown=peak>0&&peak<ws.length-1; // 先升后降 = 金字塔
+  if(ws.length>2&&upThenDown) return '🔺金字塔';
+  if(dec) return '🔻递减';
+  if(inc) return '🔺递增';
+  return '⚡变量组';
 }
 /* ===== 训练部位自动归类（5 大类） ===== */
 const TRAIN_PARTS=[
@@ -3752,16 +3793,17 @@ function renderExParts(){
   else summary='动作未识别到部位，补充动作名（如「深蹲」「卧推」）可自动归类';
   el.innerHTML=html+'<div class="ep-sum">'+summary+'</div>';
 }
-function addCustomEx(name,sets,reps,weight,cal,note,ai,part){
+function addCustomEx(name,sets,reps,weight,cal,note,ai,part,detail){
   const pk=part||classifyPart(name);
+  const calFinal = cal!=null?cal : (detail&&detail.length? estExCalFromDetail(detail) : estExCal(sets,reps,weight));
   if(!profile().customEx)profile().customEx={};
   const k=recKey(); if(!profile().customEx[k])profile().customEx[k]=[];
-  profile().customEx[k].push({name,sets,reps,weight:weight||0,cal:cal||estExCal(sets,reps,weight),note:note||'',ai:!!ai,done:true,part:pk});
+  profile().customEx[k].push({name,sets,reps,weight:weight||0,cal:calFinal,note:note||'',ai:!!ai,done:true,part:pk,detail:detail||null});
   // 写入「我的动作库」（历史，去重，更新上次表现）
   if(!profile().exLib)profile().exLib=[];
   const lib=profile().exLib.find(x=>x.name===name);
-  if(lib){lib.sets=sets;lib.reps=reps;lib.weight=weight||0;lib.cal=cal||lib.cal;lib.part=pk;}
-  else profile().exLib.push({name,sets,reps,weight:weight||0,cal:cal||estExCal(sets,reps,weight),part:pk});
+  if(lib){lib.sets=sets;lib.reps=reps;lib.weight=weight||0;lib.cal=calFinal;lib.part=pk;lib.detail=detail||lib.detail;}
+  else profile().exLib.push({name,sets,reps,weight:weight||0,cal:calFinal,part:pk,detail:detail||null});
   save();renderCustomEx();renderExLib();renderExParts();renderCalorieSummary();if(curPage==='stats')renderStats();
 }
 function renderExLib(){
@@ -3773,7 +3815,14 @@ function renderExLib(){
     const item=document.createElement('div');item.className='el-item';
     item.innerHTML='<span>'+e.name+'</span><span class="el-add" title="记录今日">＋</span>';
     item.querySelector('.el-add').onclick=()=>{
-      const perf=e.name+' '+(e.sets||3)+'组x'+(e.reps||10)+'次'+(e.weight?('x'+e.weight+'kg'):'');
+      let perf;
+      if(e.detail&&e.detail.length){
+        const ws=e.detail.map(d=>d.weight>0?d.weight:null).filter(v=>v!=null);
+        const rs=e.detail.map(d=>d.reps);
+        perf=e.name+' '+(e.detail.length)+'组'+(ws.length?(' '+ws.join('/')+'kg'):'')+' '+(rs.length?rs.join('/')+'次':'');
+      } else {
+        perf=e.name+' '+(e.sets||3)+'组x'+(e.reps||10)+'次'+(e.weight?('x'+e.weight+'kg'):'');
+      }
       const inp=document.getElementById('exInput');inp.value=perf;inp.focus();
       showFoodHint('已填入「'+perf+'」，确认或改完撳「添加」（或 🔍AI 更准）');
     };
@@ -3786,9 +3835,13 @@ function renderCustomEx(){
   if(!list.length){el.innerHTML='<div class="ce-empty">库里冇嘅动作，打上面＋AI 自动计卡 💡</div>';return;}
   el.innerHTML='';
   list.forEach((e,i)=>{
+    const meta=(e.detail&&e.detail.length)
+      ? e.detail.map(d=> d.weight>0 ? (d.weight+'×'+(d.reps||'?')) : ((d.reps||'?')+'次自重')).join(' / ')
+      : ((e.sets||'?')+'组·'+(e.reps||'?')+'次'+(e.weight?('·'+e.weight+'kg'):'（自重）'));
+    const kindTag=(e.detail&&e.detail.length>1)?('<span class="ce-kind">'+setKindTag(e.detail)+'</span>'):'';
     const div=document.createElement('div');div.className='ce-item'+(e.done?' on':'');
-    div.innerHTML='<div class="ce-main"><span class="ce-name">'+e.name+'</span>'+
-      '<span class="ce-meta">'+(e.sets||'?')+'组·'+(e.reps||'?')+'次'+(e.weight?('·'+e.weight+'kg'):'（自重）')+'</span></div>'+
+    div.innerHTML='<div class="ce-main"><span class="ce-name">'+e.name+'</span>'+kindTag+
+      '<span class="ce-meta">'+meta+'</span></div>'+
       '<div class="ce-side"><span class="ce-cal">🔥'+(e.cal||0)+'kcal</span><span class="ce-del" data-i="'+i+'">✕</span></div>'+
       (e.note?'<div class="ce-note">'+e.note+'</div>':'');
     el.appendChild(div);
@@ -3815,7 +3868,7 @@ async function aiLookupExercise(raw,inputId){
     const sets=o.sets||p.sets, reps=o.reps||p.reps, weight=(o.weight||p.weight||0);
     const cal=Math.round(o.cal);
     const part=partKeyFromName(o.part)||classifyPart(name);
-    addCustomEx(name,sets,reps,weight,cal,o.note,'ai',part);
+    addCustomEx(name,sets,reps,weight,cal,o.note,'ai',part,null);
     const inp=document.getElementById(inputId);if(inp)inp.value='';
     showFoodHint('✅ AI：'+name+' ≈ '+cal+'kcal（'+sets+'组×'+reps+'次'+(weight?('·'+weight+'kg'):'')+'）已记录');
   }catch(e){
@@ -3825,7 +3878,7 @@ async function aiLookupExercise(raw,inputId){
 document.getElementById('exAdd').onclick=()=>{
   const raw=document.getElementById('exInput').value.trim(); if(!raw)return;
   const p=parseExPerf(raw);
-  addCustomEx(p.name,p.sets,p.reps,p.weight,null,null,false);
+  addCustomEx(p.name,p.sets,p.reps,p.weight,null,null,false,undefined,p.detail);
   const cal=estExCal(p.sets,p.reps,p.weight);
   document.getElementById('exInput').value='';
   showFoodHint('➕ 已记录「'+p.name+'」≈ '+cal+'kcal（本地估算；填 Key 撳🔍AI 更准）');

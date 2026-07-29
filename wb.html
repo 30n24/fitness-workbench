@@ -630,6 +630,24 @@ html.dark .dash-card{background:#171f30}
 .badge-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
 .badge-item{background:var(--bg-2);border:1px solid var(--border);border-radius:14px;padding:14px 12px;text-align:center;opacity:.55;transition:.2s}
 .badge-item.on{opacity:1;border-color:rgba(251,146,60,.4);background:linear-gradient(135deg,rgba(251,146,60,.1),rgba(236,72,153,.06))}
+/* ===== AI 联网查设置 ===== */
+.meal-ai-btn{display:none;padding:0 10px;height:40px;border-radius:12px;border:1px solid var(--border);background:linear-gradient(135deg,var(--purple),var(--primary));color:#fff;font-size:12px;font-weight:700;white-space:nowrap}
+.meal-ai-btn:active{transform:scale(.95)}
+.ai-modal{position:fixed;inset:0;z-index:9993;background:rgba(0,0,0,.5);display:none;align-items:center;justify-content:center;padding:18px;animation:fadeIn .15s ease}
+.ai-modal.show{display:flex}
+.ai-box{background:var(--card);border-radius:18px;max-width:420px;width:100%;padding:18px 18px calc(18px + env(safe-area-inset-bottom));box-shadow:0 16px 50px rgba(0,0,0,.3);max-height:88vh;overflow:auto}
+.ai-head{font-size:16px;font-weight:800;display:flex;justify-content:space-between;align-items:center}
+.ai-close{color:var(--muted);font-size:18px;cursor:pointer;width:28px;height:28px;display:flex;align-items:center;justify-content:center}
+.ai-tip{font-size:12px;color:var(--muted);line-height:1.6;margin:10px 0 14px}
+.ai-box label{display:block;font-size:12px;color:var(--muted);margin:10px 0 4px}
+.ai-box select,.ai-box input{width:100%;height:42px;border-radius:10px;border:1px solid var(--border);background:var(--bg-2);color:var(--text);font-size:14px;padding:0 12px}
+.ai-actions{display:flex;gap:8px;margin-top:16px}
+.ai-actions button{flex:1;height:42px;border-radius:10px;border:none;font-size:14px;font-weight:700;color:#fff}
+.ai-save{background:linear-gradient(135deg,var(--primary),var(--accent))}
+.ai-test{background:var(--bg-2);color:var(--text);border:1px solid var(--border)}
+.ai-clear{background:var(--bg-2);color:var(--red);border:1px solid var(--border)}
+.ai-actions button:active{transform:scale(.97)}
+.ai-msg{font-size:12px;margin-top:12px;line-height:1.5;min-height:16px}
 .bi-icon{font-size:34px;line-height:1}
 .bi-name{font-size:14px;font-weight:700;margin-top:6px}
 .bi-desc{font-size:11px;color:var(--muted);margin-top:3px;line-height:1.4}
@@ -678,8 +696,33 @@ html.dark .dash-card{background:#171f30}
     <button class="dm-btn" id="exportBtn">📤 导出数据</button>
     <button class="dm-btn" id="importBtn">📥 导入数据</button>
     <button class="dm-btn" id="cloudBackupBtn">☁ 导出云端备份</button>
+    <button class="dm-btn" id="aiCfgBtn">🤖 AI 查热量</button>
     <input type="file" id="importFile" accept=".json" style="display:none">
     <div class="dm-hint" id="dmHint">数据存在本机浏览器，换链接前请先导出备份</div>
+  </div>
+  <div class="ai-modal" id="aiModal">
+    <div class="ai-box">
+      <div class="ai-head">🤖 AI 联网查热量 <span class="ai-close" id="aiClose">✕</span></div>
+      <div class="ai-tip">配置你自己的 AI Key（仅存本机浏览器，不会写入任何公开文件）。识别不到的食物，在饮食页点「🔍AI」即可联网查询并自动填入与保存。</div>
+      <label>服务商</label>
+      <select id="aiProvider">
+        <option value="deepseek">DeepSeek（便宜推荐）</option>
+        <option value="openai">OpenAI</option>
+        <option value="custom">自定义（兼容 OpenAI 格式）</option>
+      </select>
+      <label>API Key</label>
+      <input type="password" id="aiKey" placeholder="sk-..." autocomplete="off">
+      <label>接口地址</label>
+      <input type="text" id="aiBase" placeholder="https://api.deepseek.com/v1">
+      <label>模型名</label>
+      <input type="text" id="aiModel" placeholder="deepseek-chat">
+      <div class="ai-actions">
+        <button class="ai-save" id="aiSave">保存</button>
+        <button class="ai-test" id="aiTest">测试</button>
+        <button class="ai-clear" id="aiClear">清除</button>
+      </div>
+      <div class="ai-msg" id="aiMsg"></div>
+    </div>
   </div>
 </div>
 
@@ -824,6 +867,7 @@ html.dark .dash-card{background:#171f30}
     <div class="meal-row">
       <input type="text" id="breakfastInput" placeholder="食物+份量，如：2个鸡蛋 / 250ml全脂牛奶 / 瑞幸生椰拿铁" list="foodList">
       <button class="meal-add-btn" id="breakfastAdd">添加</button>
+      <button class="meal-ai-btn" id="breakfastAi">🔍AI</button>
     </div>
     <div class="meal-items" id="breakfastItems"></div>
     <div class="meal-total" id="breakfastTotal"></div>
@@ -834,6 +878,7 @@ html.dark .dash-card{background:#171f30}
     <div class="meal-row">
       <input type="text" id="lunchInput" placeholder="食物+份量，如：150g鸡胸肉 / 1碗糙米饭 / 瑞幸拿铁" list="foodList">
       <button class="meal-add-btn" id="lunchAdd">添加</button>
+      <button class="meal-ai-btn" id="lunchAi">🔍AI</button>
     </div>
     <div class="meal-items" id="lunchItems"></div>
     <div class="meal-total" id="lunchTotal"></div>
@@ -844,6 +889,7 @@ html.dark .dash-card{background:#171f30}
     <div class="meal-row">
       <input type="text" id="dinnerInput" placeholder="食物+份量，如：番茄豆腐鸡蛋 / 150g鸡胸肉 / 丝瓜炒肉" list="foodList">
       <button class="meal-add-btn" id="dinnerAdd">添加</button>
+      <button class="meal-ai-btn" id="dinnerAi">🔍AI</button>
     </div>
     <div class="meal-items" id="dinnerItems"></div>
     <div class="meal-total" id="dinnerTotal"></div>
@@ -1688,6 +1734,7 @@ function enterApp(){
   migrateDinner();
   renderAll();
   updateRecDateBar();
+  updateAiButtons();
   if(window.syncPartsTop)window.syncPartsTop();
   // 进入后拉取对方最新数据
   if(cloudReady()){
@@ -2702,7 +2749,12 @@ const FOOD_DB=[
   {n:'鸡翅',cal:220,u:'100g',carb:0},{n:'蟹',cal:95,u:'100g',carb:1},{n:'瘦肉',cal:143,u:'100g',carb:0},
   {n:'豆腐干',cal:140,u:'100g',carb:5},{n:'腐竹',cal:459,u:'100g',carb:11},
   {n:'牛油果',cal:160,u:'个',carb:9},{n:'蓝莓',cal:57,u:'100g',carb:14},{n:'坚果',cal:607,u:'100g',carb:20},
-  {n:'杏仁',cal:579,u:'100g',carb:22},{n:'蛋白棒',cal:200,u:'根',carb:20},{n:'能量棒',cal:200,u:'根',carb:25}
+  {n:'杏仁',cal:579,u:'100g',carb:22},{n:'蛋白棒',cal:200,u:'根',carb:20},{n:'能量棒',cal:200,u:'根',carb:25},
+  /* ===== 常见饭 / 面 / 粉 / 套餐（估算，按每份计） ===== */
+  {n:'猪脚饭',cal:800,u:'份',carb:70,b:'常见餐厅'},{n:'猪手饭',cal:800,u:'份',carb:70,b:'常见餐厅'},{n:'鸡腿饭',cal:750,u:'份',carb:75},{n:'炸鸡腿饭',cal:920,u:'份',carb:80},{n:'鸡扒饭',cal:780,u:'份',carb:72},{n:'排骨饭',cal:780,u:'份',carb:72},{n:'卤肉饭',cal:650,u:'份',carb:60},{n:'叉烧饭',cal:700,u:'份',carb:65},{n:'牛肉饭',cal:720,u:'份',carb:70},{n:'牛腩饭',cal:760,u:'份',carb:68},{n:'滑蛋牛肉饭',cal:700,u:'份',carb:68},{n:'咖喱饭',cal:700,u:'份',carb:75},{n:'蛋炒饭',cal:550,u:'份',carb:70},{n:'扬州炒饭',cal:600,u:'份',carb:72},{n:'煲仔饭',cal:820,u:'份',carb:75},{n:'盖浇饭',cal:700,u:'份',carb:72},{n:'碟头饭',cal:700,u:'份',carb:72},{n:'鳗鱼饭',cal:750,u:'份',carb:70},{n:'烤肉饭',cal:780,u:'份',carb:70},{n:'猪排饭',cal:800,u:'份',carb:72},{n:'鸡肉饭',cal:650,u:'份',carb:70},{n:'咸鱼肉粒饭',cal:700,u:'份',carb:68},{n:'油鸡饭',cal:680,u:'份',carb:70},{n:'烧鸭饭',cal:780,u:'份',carb:68},{n:'白切鸡饭',cal:650,u:'份',carb:65},{n:'便当',cal:720,u:'份',carb:73},{n:'亲子饭',cal:650,u:'份',carb:70},
+  {n:'云吞面',cal:450,u:'份',carb:50},{n:'牛腩面',cal:600,u:'份',carb:65},{n:'拉面',cal:550,u:'份',carb:70},{n:'牛肉面',cal:580,u:'份',carb:65},{n:'炸酱面',cal:550,u:'份',carb:72},{n:'担担面',cal:520,u:'份',carb:60},{n:'阳春面',cal:400,u:'份',carb:55},{n:'车仔面',cal:480,u:'份',carb:58},{n:'肠粉',cal:350,u:'份',carb:50},{n:'干炒牛河',cal:750,u:'份',carb:80},{n:'炒河粉',cal:650,u:'份',carb:75},{n:'炒粉',cal:600,u:'份',carb:75},{n:'星洲炒米',cal:620,u:'份',carb:70},{n:'乌冬面',cal:480,u:'份',carb:65},
+  {n:'皮蛋瘦肉粥',cal:350,u:'份',carb:45},{n:'艇仔粥',cal:400,u:'份',carb:50},{n:'鱼片粥',cal:380,u:'份',carb:48},{n:'及第粥',cal:380,u:'份',carb:46},{n:'瘦肉粥',cal:320,u:'份',carb:44},
+  {n:'汉堡',cal:550,u:'个',carb:45},{n:'炸鸡',cal:600,u:'个',carb:40},{n:'薯条',cal:350,u:'份',carb:45},{n:'披萨',cal:260,u:'块',carb:30},{n:'寿司',cal:400,u:'份',carb:70},{n:'三明治',cal:350,u:'个',carb:40},{n:'鸡肉沙拉',cal:350,u:'份',carb:12},{n:'凯撒沙拉',cal:380,u:'份',carb:14},{n:'饺子',cal:500,u:'份',carb:60},{n:'包子',cal:250,u:'个',carb:45},{n:'烧麦',cal:300,u:'个',carb:40},{n:'春卷',cal:200,u:'个',carb:25},{n:'煎饺',cal:450,u:'份',carb:55},{n:'葱油饼',cal:400,u:'张',carb:55},{n:'肉夹馍',cal:450,u:'个',carb:55},{n:'凉皮',cal:350,u:'份',carb:45},{n:'肉包',cal:280,u:'个',carb:48}
 ];
 const FOOD_ALIAS={
   '番薯':'红薯','蕃薯':'红薯','山芋':'红薯','地瓜':'红薯',
@@ -2722,7 +2774,10 @@ const FOOD_ALIAS={
   '肉':'猪肉','鱼':'鱼肉',
   /* 菜品/搭配别名（提升「番茄炒蛋」类自由输入识别） */
   '炒蛋':'鸡蛋','煎蛋':'鸡蛋','煮蛋':'鸡蛋','蒸蛋':'鸡蛋','荷包蛋':'鸡蛋','白煮蛋':'鸡蛋','蛋':'鸡蛋',
-  '白灼虾':'虾仁','盐水虾':'虾仁','清蒸鱼':'鱼肉','煎鱼':'鱼肉','炒肉':'猪肉','蒸肉饼':'猪肉'
+  '白灼虾':'虾仁','盐水虾':'虾仁','清蒸鱼':'鱼肉','煎鱼':'鱼肉','炒肉':'猪肉','蒸肉饼':'猪肉',
+  /* 饭面套餐·地区/俗语别名 */
+  '鸡髀饭':'鸡腿饭','猪手饭':'猪脚饭','碟饭':'盖浇饭','碟头饭':'盖浇饭','牛腩饭':'牛肉饭',
+  '叉烧饭':'叉烧饭','油鸡饭':'油鸡饭','烧味饭':'叉烧饭','双拼饭':'盖浇饭','三宝饭':'盖浇饭','髀饭':'鸡腿饭'
 };
 const DINNER_MENU=[
   {n:'清蒸鱼 + 时蔬',cal:280,carb:12,tag:'low'},{n:'香煎鸡胸 + 芦笋',cal:320,carb:8,tag:'low'},
@@ -3415,6 +3470,56 @@ document.getElementById('dietNote').addEventListener('input',e=>{
   noteTimer=setTimeout(()=>{profile().notes[recKey()]=e.target.value;save()},300);
 });
 
+/* ===== AI 联网查热量（可选，key 仅存本机） ===== */
+function getAICfg(){try{return JSON.parse(localStorage.getItem('fw_ai_cfg')||'null');}catch(e){return null;}}
+function saveAICfg(c){localStorage.setItem('fw_ai_cfg',JSON.stringify(c));}
+const AI_DEFAULTS={deepseek:{base:'https://api.deepseek.com/v1',model:'deepseek-chat'},openai:{base:'https://api.openai.com/v1',model:'gpt-4o-mini'},custom:{base:'',model:''}};
+function openAiCfg(){
+  const m=document.getElementById('aiModal');if(!m)return;
+  const cfg=getAICfg()||{};
+  document.getElementById('aiProvider').value=cfg.provider||'deepseek';
+  const d=AI_DEFAULTS[cfg.provider||'deepseek']||AI_DEFAULTS.deepseek;
+  document.getElementById('aiKey').value=cfg.key||'';
+  document.getElementById('aiBase').value=cfg.base||d.base;
+  document.getElementById('aiModel').value=cfg.model||d.model;
+  document.getElementById('aiMsg').textContent='';
+  m.classList.add('show');
+}
+function updateAiButtons(){
+  const has=!!getAICfg();
+  ['breakfast','lunch','dinner'].forEach(k=>{const b=document.getElementById(k+'Ai');if(b)b.style.display=has?'inline-block':'none';});
+}
+async function aiLookupFood(raw,kind,inputId){
+  const cfg=getAICfg();
+  if(!cfg||!cfg.key){showFoodHint('未配置 AI：去「数据管理 → 🤖 AI 查热量」填写 Key');openAiCfg();return;}
+  showFoodHint('🔍 正在用 AI 查询「'+raw+'」热量…');
+  try{
+    const sys='你是专业营养师。用户给你一个食物名称（可能含份量/做法）。请估算它「一份典型分量」的热量(千卡)与碳水(克)。只输出 JSON：{"cal":数字,"carb":数字,"unit":"份","note":"简短中文说明"}，不要任何多余文字。';
+    const body={model:cfg.model||'deepseek-chat',messages:[{role:'system',content:sys},{role:'user',content:raw}],temperature:0.2,response_format:{type:'json_object'}};
+    const resp=await fetch(cfg.base.replace(/\/+$/,'')+'/chat/completions',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+cfg.key},body:JSON.stringify(body)});
+    if(!resp.ok){const t=await resp.text().catch(()=>'');throw new Error('HTTP '+resp.status+(t?(' '+t.slice(0,80)):''));}
+    const j=await resp.json();
+    const content=j.choices&&j.choices[0]&&j.choices[0].message?j.choices[0].message.content:'';
+    const mm=content.match(/\{[\s\S]*\}/);
+    const o=mm?JSON.parse(mm[0]):null;
+    if(!o||typeof o.cal!=='number')throw new Error('AI 返回格式异常');
+    const cal=Math.round(o.cal),carb=Math.round(o.carb||0),unit=o.unit||'份';
+    if(!profile().foods)profile().foods=[];
+    if(!profile().foods.some(f=>f.n===raw))profile().foods.push({n:raw,cal,carb,u:unit});
+    save();renderCustomFood();if(curPage==='diet')renderDiet();
+    if(!profile()[kind])profile()[kind]={};
+    if(!profile()[kind][recKey()])profile()[kind][recKey()]=[];
+    profile()[kind][recKey()].push({name:raw,cal,carb,matched:raw});
+    save();
+    const inp=document.getElementById(inputId);if(inp)inp.value='';
+    if(kind==='breakfast')renderBreakfast();else if(kind==='lunch')renderLunch();else renderDinner();
+    renderDietSummary();
+    showFoodHint('✅ AI：'+raw+' ≈ '+cal+'kcal / '+carb+'g碳（已存为自定义食物）');
+  }catch(e){
+    showFoodHint('⚠️ AI 查询失败：'+e.message+'（检查 Key/网络；若提示跨域，可在「自定义」里填支持浏览器跨域的接口地址）');
+  }
+}
+
 /* 拍照事件 */
 document.getElementById('photoTakeBtn').onclick=()=>document.getElementById('photoInput').click();
 const _phInput=document.getElementById('photoInput');
@@ -3510,6 +3615,47 @@ document.getElementById('bodySave').onclick=saveBody;
 document.getElementById('reportBtn').onclick=generateReport;
 // 成就徽章
 document.getElementById('badgeBtn').onclick=openBadges;
+// AI 查热量设置
+document.getElementById('aiCfgBtn').onclick=openAiCfg;
+document.getElementById('aiClose').onclick=()=>document.getElementById('aiModal').classList.remove('show');
+document.getElementById('aiProvider').onchange=function(){
+  const d=AI_DEFAULTS[this.value]||AI_DEFAULTS.deepseek;
+  document.getElementById('aiBase').value=d.base;document.getElementById('aiModel').value=d.model;
+};
+document.getElementById('aiSave').onclick=function(){
+  const provider=document.getElementById('aiProvider').value;
+  const key=document.getElementById('aiKey').value.trim();
+  const base=document.getElementById('aiBase').value.trim();
+  const model=document.getElementById('aiModel').value.trim();
+  if(!key){document.getElementById('aiMsg').textContent='⚠️ 请填写 API Key';return;}
+  if(!base){document.getElementById('aiMsg').textContent='⚠️ 请填写接口地址';return;}
+  saveAICfg({provider,key,base,model});updateAiButtons();
+  document.getElementById('aiMsg').textContent='✅ 已保存（Key 仅存本机）';
+  setTimeout(()=>document.getElementById('aiModal').classList.remove('show'),700);
+};
+document.getElementById('aiClear').onclick=function(){
+  localStorage.removeItem('fw_ai_cfg');updateAiButtons();
+  document.getElementById('aiMsg').textContent='🗑 已清除 AI 配置';
+};
+document.getElementById('aiTest').onclick=async function(){
+  const provider=document.getElementById('aiProvider').value;
+  const key=document.getElementById('aiKey').value.trim();
+  const base=document.getElementById('aiBase').value.trim();
+  const model=document.getElementById('aiModel').value.trim();
+  const msg=document.getElementById('aiMsg');
+  if(!key||!base){msg.textContent='⚠️ 请先填 Key 与接口地址';return;}
+  msg.textContent='测试中…';
+  try{
+    const resp=await fetch(base.replace(/\/+$/,'')+'/chat/completions',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+key},body:JSON.stringify({model:model||'deepseek-chat',messages:[{role:'user',content:'回复JSON {"ok":1}'}],temperature:0,response_format:{type:'json_object'}})});
+    const j=await resp.json();
+    msg.textContent=resp.ok?'✅ 连接成功：'+(j.choices?j.choices[0].message.content:'')+'':'❌ HTTP '+resp.status;
+  }catch(e){msg.textContent='❌ 失败：'+e.message+'（多为跨域/网络限制）';}
+};
+// 三餐 AI 查询按钮
+['breakfast','lunch','dinner'].forEach(kind=>{
+  const b=document.getElementById(kind+'Ai');
+  if(b)b.onclick=()=>{const inp=document.getElementById(kind+'Input');const txt=inp.value.trim();if(!txt){showFoodHint('先输入食物名称');return;}aiLookupFood(txt,kind,kind+'Input');};
+});
 
 /* 11点更新检查 */
 setInterval(()=>{const n=new Date();if(n.getHours()===11&&n.getMinutes()<5)renderDiet()},60000);

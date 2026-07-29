@@ -616,6 +616,9 @@ html.dark .dash-card{background:#171f30}
 .ci-num{font-size:20px;font-weight:800;color:var(--primary)}
 .ci-card.pB .ci-num{color:var(--pink)}
 .ci-lab{font-size:10px;color:var(--muted);margin-top:3px}
+.ci-parts{font-size:13px;color:var(--text);background:linear-gradient(135deg,rgba(91,140,255,.12),rgba(244,114,182,.1));border:1px solid var(--border);border-radius:12px;padding:8px 10px;margin:0 0 10px;line-height:1.5}
+.ci-parts b{color:var(--primary)}
+.ci-card.pB .ci-parts b{color:var(--pink)}
 .ci-quote{font-size:13px;color:var(--text);background:var(--bg-2);border-radius:10px;padding:10px;margin-bottom:14px;line-height:1.5}
 .ci-actions{display:flex;gap:8px}
 .ci-save{flex:1;padding:12px;border-radius:12px;background:linear-gradient(135deg,var(--primary),var(--accent));color:#fff;font-size:14px;font-weight:700;border:none}
@@ -640,6 +643,14 @@ html.dark .dash-card{background:#171f30}
 .ex-lib-card{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:14px;margin:14px 2px 0}
 .ex-lib-card .section-title{margin-bottom:2px}
 .ex-lib-list{margin-top:8px;display:flex;flex-wrap:wrap;gap:8px}
+.ex-parts-card{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:14px;margin:14px 2px 0}
+.ex-parts-card .section-title{margin-bottom:8px}
+.ex-parts{display:flex;flex-wrap:wrap;gap:8px}
+.ep-chip{display:flex;align-items:center;gap:5px;padding:7px 11px;border-radius:999px;border:1px solid var(--border);background:var(--bg-2);color:var(--muted);font-size:13px;font-weight:700;opacity:.5}
+.ep-chip.on{opacity:1;color:var(--text);border-color:transparent;background:linear-gradient(135deg,rgba(91,140,255,.18),rgba(244,114,182,.14));box-shadow:0 2px 10px rgba(79,124,255,.18)}
+.ep-chip i{font-style:normal;background:var(--primary);color:#fff;border-radius:999px;font-size:10px;padding:1px 6px;margin-left:2px}
+.ep-sum{width:100%;font-size:12px;color:var(--muted);margin-top:10px;line-height:1.6}
+.ep-sum b{color:var(--text)}
 .el-item{display:inline-flex;align-items:center;gap:4px;background:linear-gradient(135deg,rgba(91,140,255,.1),rgba(244,114,182,.07));border:1px solid var(--border);border-radius:20px;padding:6px 10px;font-size:13px;font-weight:600}
 .el-item .el-add{cursor:pointer;color:var(--primary);font-weight:800;font-size:17px;margin-left:2px;line-height:1}
 .el-empty{font-size:12px;color:var(--muted);text-align:center;padding:6px 0;width:100%}
@@ -837,6 +848,10 @@ html.dark .dash-card{background:#171f30}
       <option value="二头弯举"></option><option value="三头下压"></option><option value="平板支撑"></option>
       <option value="俄罗斯转体"></option><option value="悬垂举腿"></option><option value="引体向上"></option>
     </datalist>
+  </div>
+  <div class="ex-parts-card">
+    <div class="section-title">🧭 今日练咗边度 <span class="hint">自动归类 5 大部位</span></div>
+    <div class="ex-parts" id="exPartsView"></div>
   </div>
   <div class="ex-lib-card">
     <div class="section-title">📚 我的动作库 <span class="hint">点选即可记录今日</span></div>
@@ -1571,7 +1586,7 @@ function recKey(){const d=curRecDate;return `${d.getFullYear()}-${String(d.getMo
 function isRecToday(){return recKey()===todayKey();}
 function recDayLabel(){const wk=['日','一','二','三','四','五','六'];const d=curRecDate;return isRecToday()?'今日':(d.getMonth()+1)+'月'+d.getDate()+'日 周'+wk[d.getDay()];}
 // 切换记录日期后刷新相关视图（训练/饮食/有氧/饮水/羽毛球）
-function applyRecDate(){updateRecDateBar();renderTopbar();renderParts();renderExercises();renderBadminton();renderCardio();renderCalorieSummary();renderCustomEx();renderExLib();renderWater();if(curPage==='diet')renderDiet();}
+function applyRecDate(){updateRecDateBar();renderTopbar();renderParts();renderExercises();renderBadminton();renderCardio();renderCalorieSummary();renderCustomEx();renderExLib();renderExParts();renderWater();if(curPage==='diet')renderDiet();}
 function shiftRecDate(n){curRecDate.setDate(curRecDate.getDate()+n);applyRecDate();}
 function resetRecDate(){curRecDate=new Date();applyRecDate();}
 function setRecDate(y,m,d){curRecDate=new Date(y,m-1,d);applyRecDate();}
@@ -2532,13 +2547,22 @@ function doCheckin(){
   // 解锁徽章 + 庆祝分享卡
   refreshBadges();
   const sum=getCheckinSummary(k);
-  if(sum.doneCount>0||t.exercises[curPart]&&Object.keys(t.exercises[curPart]||{}).length){
+  const todayEx=(profile().customEx?.[k]||[]);
+  if(sum.doneCount>0||todayEx.length>0){
     showCheckinCard(sum);
   }
 }
 /* 计算某日训练完成度与总容量 */
 function getCheckinSummary(k){
   const p=profile();
+  const list=(p.customEx?.[k]||[]);
+  if(list.length){
+    let volume=0,cal=0; const cnt={};
+    list.forEach(e=>{ volume+=(e.weight||0)*(e.reps||0)*(e.sets||0); cal+=(e.cal||0); if(e.part)cnt[e.part]=(cnt[e.part]||0)+1; });
+    const parts=TRAIN_PARTS.filter(x=>cnt[x.key]);
+    let primary=null,best=-1; parts.forEach(x=>{ if(cnt[x.key]>best){best=cnt[x.key];primary=x;} });
+    return {key:k,mode:'free',partKey:primary?primary.key:null,partName:primary?primary.name:'综合训练',emoji:primary?primary.emoji:'💪',doneCount:list.length,totalCount:list.length,volume:Math.round(volume),cal:Math.round(cal),parts};
+  }
   const c=p.checkins[k]||{};
   const partKey=c.part||curPart;
   const exs=exData()[partKey]||[];
@@ -2554,7 +2578,7 @@ function getCheckinSummary(k){
     }
   });
   const pi=partsList().find(x=>x.key===partKey);
-  return {key:k,partKey,partName:pi?pi.name:partKey,emoji:pi?pi.emoji:'💪',doneCount,totalCount:exs.length,volume:Math.round(volume),cal:doneCalForPart(partKey)};
+  return {key:k,mode:'fixed',partKey,partName:pi?pi.name:partKey,emoji:pi?pi.emoji:'💪',doneCount,totalCount:exs.length,volume:Math.round(volume),cal:doneCalForPart(partKey),parts:[]};
 }
 function doneCalForPart(partKey){
   const exs=exData()[partKey]||[];
@@ -2588,8 +2612,9 @@ function showCheckinCard(sum){
     <div class="ci-top">🎉 今日训练完成</div>
     <div class="ci-date">${sum.key} · ${profile().name||'我'}</div>
     <div class="ci-hero"><span class="ci-emoji">${sum.emoji}</span><span class="ci-part">${sum.partName}</span></div>
+    <div class="ci-parts">🧭 今日部位：<b>${sum.parts&&sum.parts.length?sum.parts.map(x=>x.name).join(' · '):'未识别'}</b>${sum.parts&&sum.parts.length?('（'+sum.parts.length+'/5）'):''}</div>
     <div class="ci-stats">
-      <div class="ci-stat"><div class="ci-num">${sum.doneCount}/${sum.totalCount}</div><div class="ci-lab">完成动作</div></div>
+      <div class="ci-stat"><div class="ci-num">${sum.mode==='free'?sum.doneCount:(sum.doneCount+'/'+sum.totalCount)}</div><div class="ci-lab">${sum.mode==='free'?'训练动作':'完成动作'}</div></div>
       <div class="ci-stat"><div class="ci-num">${sum.volume.toLocaleString()}</div><div class="ci-lab">总容量 kg</div></div>
       <div class="ci-stat"><div class="ci-num">${sum.cal}</div><div class="ci-lab">消耗 kcal</div></div>
     </div>
@@ -2617,7 +2642,8 @@ function renderCheckinCanvas(sum){
   x.fillStyle='#1f2733';x.font='34px sans-serif';x.fillText(sum.key+' · '+(profile().name||'我'),W/2,375);
   x.font='170px sans-serif';x.fillText(sum.emoji,W/2,575);
   x.fillStyle='#1f2733';x.font='bold 76px sans-serif';x.fillText(sum.partName,W/2,700);
-  const stats=[['完成动作',sum.doneCount+'/'+sum.totalCount],['总容量 kg',sum.volume.toLocaleString()],['消耗 kcal',sum.cal]];
+  if(sum.parts&&sum.parts.length){x.fillStyle='#7a869a';x.font='32px sans-serif';x.fillText('今日部位：'+sum.parts.map(p=>p.name).join(' · ')+'（'+sum.parts.length+'/5）',W/2,758);}
+  const stats=[['训练动作',sum.mode==='free'?(''+sum.doneCount):(sum.doneCount+'/'+sum.totalCount)],['总容量 kg',sum.volume.toLocaleString()],['消耗 kcal',sum.cal]];
   let y=840;
   stats.forEach(([lab,v])=>{x.fillStyle='#7a869a';x.font='34px sans-serif';x.fillText(lab,W/2,y);x.fillStyle='#4f7cff';x.font='bold 64px sans-serif';x.fillText(v,W/2,y+72);y+=180;});
   x.fillStyle='rgba(31,39,51,0.5)';x.font='30px sans-serif';x.fillText('健身计划工作台 · 坚持就是胜利',W/2,H-130);
@@ -3606,16 +3632,65 @@ function estExCal(sets,reps,weight){
   if(weight&&weight>0) return Math.round(sets*reps*(0.045*weight+0.03*bw));
   return Math.round(sets*reps*0.045*bw);
 }
-function addCustomEx(name,sets,reps,weight,cal,note,ai){
+/* ===== 训练部位自动归类（5 大类） ===== */
+const TRAIN_PARTS=[
+  {key:'shoulder',name:'肩部',emoji:'🏋️'},
+  {key:'back',name:'背部',emoji:'🎯'},
+  {key:'chest',name:'胸部',emoji:'💪'},
+  {key:'abs',name:'腹部',emoji:'🔥'},
+  {key:'legs',name:'臀腿部',emoji:'🍑'}
+];
+function classifyPart(name){
+  const n=(''+name).toLowerCase();
+  const rules=[
+    ['chest',['胸','卧推','推胸','飞鸟','夹胸','俯卧撑','双杠','bench','chest','pushup','卧']],
+    ['back',['背','引体','划船','下拉','硬拉','挺伸','山羊挺','deadlift','pull','row','lat']],
+    ['shoulder',['肩','推举','平举','侧平','前平','肩上','shoulder','press','fly']],
+    ['abs',['腹','卷腹','仰卧起坐','平板支撑','俄挺','plank','crunch','abs','转体','举腿','悬垂']],
+    ['legs',['臀','腿','深蹲','箭步','弓步','腿举','臀桥','提踵','臀推','分腿蹲','罗马尼亚','摇摆','squat','lunge','leg','glute','calf','保加利亚']]
+  ];
+  for(const [key,kws] of rules){ if(kws.some(k=>n.includes(k.toLowerCase()))) return key; }
+  return '';
+}
+function partKeyFromName(nm){
+  if(!nm)return '';
+  const s=(''+nm).trim();
+  const m=TRAIN_PARTS.find(p=>s===p.name||s.includes(p.name));
+  return m?m.key:'';
+}
+function todayTrainedParts(){
+  const list=(profile().customEx?.[recKey()]||[]);
+  const done=new Set(list.filter(e=>e.part).map(e=>e.part));
+  return TRAIN_PARTS.filter(p=>done.has(p.key));
+}
+function renderExParts(){
+  const el=document.getElementById('exPartsView'); if(!el)return;
+  const list=(profile().customEx?.[recKey()]||[]);
+  const cnt={}; list.forEach(e=>{ if(e.part)cnt[e.part]=(cnt[e.part]||0)+1; });
+  const done=new Set(Object.keys(cnt));
+  let html=TRAIN_PARTS.map(p=>{
+    const on=done.has(p.key);
+    return '<div class="ep-chip'+(on?' on':'')+'">'+p.emoji+'<span>'+p.name+'</span>'+(on?'<i>'+cnt[p.key]+'</i>':'')+'</div>';
+  }).join('');
+  const parts=todayTrainedParts();
+  const unc=list.length-parts.reduce((a,p)=>a+cnt[p.key],0);
+  let summary;
+  if(!list.length) summary='今日仲未记录动作，练完会自動归类到 5 大部位 💡';
+  else if(parts.length) summary='今日覆盖 <b>'+parts.length+'/5</b> 部位：'+parts.map(p=>p.name).join(' · ')+(unc?('（'+unc+' 个未识别）'):'');
+  else summary='动作未识别到部位，补充动作名（如「深蹲」「卧推」）可自动归类';
+  el.innerHTML=html+'<div class="ep-sum">'+summary+'</div>';
+}
+function addCustomEx(name,sets,reps,weight,cal,note,ai,part){
+  const pk=part||classifyPart(name);
   if(!profile().customEx)profile().customEx={};
   const k=recKey(); if(!profile().customEx[k])profile().customEx[k]=[];
-  profile().customEx[k].push({name,sets,reps,weight:weight||0,cal:cal||estExCal(sets,reps,weight),note:note||'',ai:!!ai,done:true});
+  profile().customEx[k].push({name,sets,reps,weight:weight||0,cal:cal||estExCal(sets,reps,weight),note:note||'',ai:!!ai,done:true,part:pk});
   // 写入「我的动作库」（历史，去重，更新上次表现）
   if(!profile().exLib)profile().exLib=[];
   const lib=profile().exLib.find(x=>x.name===name);
-  if(lib){lib.sets=sets;lib.reps=reps;lib.weight=weight||0;lib.cal=cal||lib.cal;}
-  else profile().exLib.push({name,sets,reps,weight:weight||0,cal:cal||estExCal(sets,reps,weight)});
-  save();renderCustomEx();renderExLib();renderCalorieSummary();if(curPage==='stats')renderStats();
+  if(lib){lib.sets=sets;lib.reps=reps;lib.weight=weight||0;lib.cal=cal||lib.cal;lib.part=pk;}
+  else profile().exLib.push({name,sets,reps,weight:weight||0,cal:cal||estExCal(sets,reps,weight),part:pk});
+  save();renderCustomEx();renderExLib();renderExParts();renderCalorieSummary();if(curPage==='stats')renderStats();
 }
 function renderExLib(){
   const el=document.getElementById('exLibList'); if(!el)return;
@@ -3654,7 +3729,7 @@ async function aiLookupExercise(raw,inputId){
   showFoodHint('🔍 正在用 AI 估算「'+raw+'」消耗…');
   const bw=latestWeight(curProfile)||60;
   try{
-    const sys='你是专业健身教练。用户做咗一个抗阻/自重训练动作，会俾你动作名同佢嘅表现（组数、次数、负重，可能夹带口语/描述）。请按佢体重 '+bw+'kg 估算呢次训练总消耗热量(千卡)。只输出 JSON：{"cal":数字,"sets":数字,"reps":数字,"weight":数字或0,"name":"动作规范中文名（去口语/去描述，例如用户讲『今天深蹲搞了』回『深蹲』、『练咗硬拉好攰』回『硬拉』）","note":"简短中文说明"}，唔好有任何多余文字。若用户冇讲负重，weight 填 0（当作自重动作）。';
+    const sys='你是专业健身教练。用户做咗一个抗阻/自重训练动作，会俾你动作名同佢嘅表现（组数、次数、负重，可能夹带口语/描述）。请按佢体重 '+bw+'kg 估算呢次训练总消耗热量(千卡)。只输出 JSON：{"cal":数字,"sets":数字,"reps":数字,"weight":数字或0,"name":"动作规范中文名（去口语/去描述，例如用户讲『今天深蹲搞了』回『深蹲』、『练咗硬拉好攰』回『硬拉』）","part":"动作主要训练部位，只能是以下之一：肩部 / 背部 / 胸部 / 腹部 / 臀腿部（按主要刺激肌群判断；自重动作亦可归类）","note":"简短中文说明"}，唔好有任何多余文字。若用户冇讲负重，weight 填 0（当作自重动作）。';
     const body={model:cfg.model||'deepseek-chat',messages:[{role:'system',content:sys},{role:'user',content:raw}],temperature:0.2,response_format:{type:'json_object'}};
     const resp=await fetch(cfg.base.replace(/\/+$/,'')+'/chat/completions',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+cfg.key},body:JSON.stringify(body)});
     if(!resp.ok){const t=await resp.text().catch(()=>'');throw new Error('HTTP '+resp.status+(t?(' '+t.slice(0,80)):''));}
@@ -3667,7 +3742,8 @@ async function aiLookupExercise(raw,inputId){
     const name=(o.name&&(''+o.name).trim())||p.name||raw.trim();
     const sets=o.sets||p.sets, reps=o.reps||p.reps, weight=(o.weight||p.weight||0);
     const cal=Math.round(o.cal);
-    addCustomEx(name,sets,reps,weight,cal,o.note,'ai');
+    const part=partKeyFromName(o.part)||classifyPart(name);
+    addCustomEx(name,sets,reps,weight,cal,o.note,'ai',part);
     const inp=document.getElementById(inputId);if(inp)inp.value='';
     showFoodHint('✅ AI：'+name+' ≈ '+cal+'kcal（'+sets+'组×'+reps+'次'+(weight?('·'+weight+'kg'):'')+'）已记录');
   }catch(e){

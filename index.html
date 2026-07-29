@@ -2748,7 +2748,7 @@ function renderCheckinBtn(){
   const lb=recDayLabel();
   // 调试：显示当前日期key
   const dbg=document.getElementById('recDateDbg');
-  if(dbg)dbg.textContent='日期: '+recKey()+' | 今天: '+todayKey()+' | isToday: '+isRecToday()+' | rest: '+rest+' | done: '+done+(!rest&&!done?' | 📝 补登记':'');
+  if(dbg)dbg.textContent='key='+recKey()+' | cur.toISO='+curRecDate.toISOString().slice(0,10)+' | cur.getDate='+curRecDate.getDate()+' | today='+todayKey()+' | isToday='+isRecToday()+' | rest='+rest+' | done='+done+(!rest&&!done?' | 📝 补登记':'');
   if(isRecToday()){
     if(rest)btn.textContent='🛌 今日休息中（点此改为训练）';
     else if(done)btn.textContent='✓ 今日已打卡（点此取消）';

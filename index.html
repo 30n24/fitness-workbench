@@ -2427,6 +2427,10 @@ function renderStats(){
         else { const part=c.part; if(part)partDays[part]=(partDays[part]||0)+1; }
       }
     });
+    // 部位分布：聚合实际记录嘅每个动作部位（唔只睇打卡时选嘅单一部位）
+    Object.keys(data.customEx||{}).forEach(k=>{
+      if(k.startsWith(mk))(data.customEx[k]||[]).forEach(e=>{ if(e.part)partDays[e.part]=(partDays[e.part]||0)+1; });
+    });
     const trainDays=checkinDays-restDays;
     Object.keys(data.badminton).forEach(k=>{
       if(k.startsWith(mk)){bdDays++;bdMins+=data.badminton[k].duration||0;totalCal+=(data.badminton[k].duration||0)*7}
@@ -2492,7 +2496,7 @@ function renderPartnerToday(){
     const partKey=checkin.part;
     const parts=partner==='A'?PARTS_A:PARTS_B;
     const partInfo=parts.find(p=>p.key===partKey);
-    const partName=partInfo?partInfo.name:partKey;
+    const partName=partInfo?partInfo.name:(partKey||'未分类');
     // 统计完成动作数
     let doneCount=0;
     if(checkin.exercises&&checkin.exercises[partKey]){
@@ -2636,7 +2640,7 @@ function daySummaryHTML(p,k){
     if(c.exercises&&c.exercises[c.part]){
       Object.values(c.exercises[c.part]).forEach(lv=>{ if(typeof lv==='object')done+=Object.keys(lv).length; else if(lv)done++; });
     }
-    rows+=`<div class="dp-row"><span>💪 训练</span><span class="dv">${pi?pi.emoji:''}${pi?pi.name:c.part} · ${done}项</span></div>`;
+    rows+=`<div class="dp-row"><span>💪 训练</span><span class="dv">${pi?pi.emoji:''}${pi?pi.name:(c.part||'未分类')} · ${done}项</span></div>`;
   } else {
     rows+=`<div class="dp-row"><span>💪 训练</span><span class="dv" style="color:var(--muted)">未打卡</span></div>`;
   }

@@ -1,7 +1,7 @@
 # 健身计划工作台（fitness-workbench）续接说明
 
 > 用途：新开任务会话时，把本文件内容贴给 AI，它即可无缝衔接，不必重新了解项目。
-> 最后更新：v47（2026-07-31）。代码托管：GitHub Pages `30n24/fitness-workbench`。
+> 最后更新：v48（2026-07-31）。代码托管：GitHub Pages `30n24/fitness-workbench`。
 
 ---
 
@@ -87,6 +87,7 @@
 | v45 | 修复冷启动（退出后台杀进程再重开）今日已训练记录不显示：根因 `enterApp()` 调 `renderAll()` 但旧 `renderAll()` 漏了 `renderCustomEx()`/`renderExParts()`（这两只在日期翻页的 `applyRecDate()` 里），导致冷启动没画今日训练列表与 5 部位视图，翻日才触发显示。现把 `renderCustomEx();renderExParts();` 补进 `renderAll()`，冷启动即渲染今日记录 |
 | v46 | 四个优化：(1) 饮食输入框去原生 datalist 截断（移除 `list="foodList"`+`autocomplete="off"`，改用「最近食物」点击小标签 `#foodQuick`，跟 v41 同思路）；(2) 修热量缺口符号 bug（缺口达标时 tag 误显 `-500kcal`，改为 `+' +500kcal`）；(3) 热量缺口并入实际运动消耗 `burn=tdee+exCal`，力量/有氧/羽毛球均计入缺口；(4) 云同步加固：`doSync` 加 `_dirtyPush` 避免「仅拉取」外层吞掉待推送写入，乐观锁 409 重试由 1 次升为最多 3 次取最新 sha |
 | v47 | 热量缺口改严格口径（用户要求不重复计算）：缺口 = 基础代谢 + 非训练日常活动(活动系数封顶轻度活动 0.375) + 实际记录运动(exCal)，训练只计一次。修复 v46 `tdee+exCal` 在活动系数偏高时会把活动系数里「已含训练假设」与 exCal 重复叠加的问题；同例(活动1.55+力量300)严格缺口 863 < 朴素 1125 |
+| v48 | 严格口径全页对齐：抽出共享函数 `actualBurn(p, exCal)`（基础代谢+非训练日常+记录运动，训练只计一次）作为唯一真相来源；饮食页 `renderCalorieSummary` 改用它；概览/统计页新增「今日实际总消耗」一行（用同公式）。月报/周报/概览的「运动消耗/预估消耗」本就直接加总 `e.cal`（=exCal 同源），不受影响、无重复 |
 
 ---
 

@@ -1705,7 +1705,7 @@ const MENUS = {
 const KEY='fitness_workbench_v2';
 let state=load();
 // 强制缓存更新：版本变化时清除所有 sw 缓存并硬刷新
-const APP_VER='47';
+const APP_VER='48';
 if(localStorage.getItem('app_ver')!==APP_VER){
   localStorage.setItem('app_ver',APP_VER);
   if('caches' in window)caches.keys().then(n=>{n.forEach(c=>{if(c.includes('fitness-workbench'))caches.delete(c);});}).then(()=>location.reload(true));
@@ -2010,6 +2010,15 @@ function tdeeOf(p){
   const m=state[p].meta||{};
   if(!m.activity)return null;
   return Math.round(b*m.activity);
+}
+// 严格口径实际总消耗：基础代谢 + 非训练日常活动(活动系数封顶轻度活动，剔除其「训练假设」) + 实际记录运动(exCal)；训练只计一次
+// 全页统一用此函数，避免各页各算各的导致口径不一致 / 重复计
+function actualBurn(p, exCal){
+  const bmr=bmrOf(p)||0;
+  const m=state[p].meta||{};
+  const act=m.activity||1;
+  const neRatio=Math.min(act-1,0.375);
+  return Math.round(bmr*(1+neRatio)+exCal);
 }
 function renderHomeDash(){
   const el=document.getElementById('homeDash');if(!el)return;
@@ -2561,6 +2570,12 @@ function renderStats(){
     const rate=Math.round(checkinDays/daysInMonth*100);
     const name=data.name||('计划 '+p);
     const emoji=p==='A'?'🏃':'🧘';
+    // 今日实际总消耗（严格口径，与饮食页共用 actualBurn）：基础代谢 + 非训练日常 + 今日记录运动
+    const tk=todayKey(); const pD=state[p]; let texCal=0;
+    (pD.cardio?.[tk]||[]).forEach(c=>texCal+=cardioCalOf(c));
+    if(pD.badminton?.[tk])texCal+=pD.badminton[tk].duration*7;
+    (pD.customEx?.[tk]||[]).forEach(e=>{ if(e.done!==false)texCal+=(e.cal||0); });
+    const todayBurnTxt = bmrOf(p)!=null ? actualBurn(p,texCal)+'kcal' : '—';
     const card=document.getElementById('ov'+p);
     // 部位分布：依次列出该计划全部部位（含 0 次），不再只显示有记录的
     const parts = p==='A'?PARTS_A:PARTS_B;
@@ -2577,6 +2592,7 @@ function renderStats(){
       <div class="ov-stat"><span class="k">🏸 羽毛球</span><span class="v">${bdDays}次 / ${bdMins}分钟</span></div>
       <div class="ov-stat"><span class="k">🏃 有氧运动</span><span class="v">${cardioDays}次 / ${cardioMins}分钟</span></div>
       <div class="ov-stat"><span class="k">🔥 预估消耗</span><span class="v">${totalCal}kcal</span></div>
+      <div class="ov-stat"><span class="k">🔥 今日实际总消耗</span><span class="v">${todayBurnTxt}</span></div>
       <div class="ov-stat"><span class="k">🥬 低碳日</span><span class="v">${lowDays}天</span></div>
       <div class="ov-stat"><span class="k">🍚 高碳日</span><span class="v">${highDays}天</span></div>
       <div class="ov-bar ${p==='A'?'pA':'pB'}"><div class="bl"><span>本月完成率</span><span>${rate}%</span></div><div class="track"><div class="fill" style="width:${rate}%"></div></div></div>`;
@@ -3457,10 +3473,7 @@ function renderCalorieSummary(){
       calTotal.textContent=foodCal+'kcal';   // 饮食摄入（吃进来嘅）
       calBurn.textContent=exCal+'kcal';       // 运动消耗（记录值，仅参考）
       if(tdee!=null){
-        const bmr=bmrOf(curProfile)||0;
-        const act=(state[curProfile].meta&&state[curProfile].meta.activity)||1;
-        const neRatio=Math.min(act-1,0.375);   // 非训练日常活动比例：活动系数含训练假设，封顶轻度活动(0.375)以免重复计入已记录训练
-        const burn=Math.round(bmr*(1+neRatio)+exCal); // 严格口径：基础代谢 + 非训练日常活动 + 实际记录运动(有氧/羽毛球/力量)，训练只计一次
+        const burn=actualBurn(curProfile, exCal); // 严格口径实际总消耗（基础+非训练日常+记录运动，训练只计一次），与统计页共用 actualBurn
         const def=burn-foodCal;                // 真正热量缺口 = 实际总消耗 − 摄入
         const cls=def>0?'cal-neg':'cal-pos';  // 缺口达标(绿) / 盈余(橙)
         const tag=def>0?('缺口达标 +'+def+'kcal'):('高于消耗，盈余 +'+(-def)+'kcal');

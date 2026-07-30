@@ -736,6 +736,8 @@ html.dark .dash-card{background:#171f30}
 .el-item{display:inline-flex;align-items:center;gap:4px;background:linear-gradient(135deg,rgba(91,140,255,.1),rgba(244,114,182,.07));border:1px solid var(--border);border-radius:20px;padding:6px 10px;font-size:13px;font-weight:600}
 .el-item .el-add{cursor:pointer;color:var(--primary);font-weight:800;font-size:17px;margin-left:2px;line-height:1}
 .el-item .el-chart{cursor:pointer;font-size:14px;line-height:1;margin-left:2px}
+.el-item .el-del{cursor:pointer;font-size:14px;line-height:1;margin-left:2px;color:var(--red);opacity:.65}
+.el-item .el-del:active{opacity:1}
 .el-empty{font-size:12px;color:var(--muted);text-align:center;padding:6px 0;width:100%}
 .ex-lib-list .el-hidden{display:none!important}
 .ex-lib-list.expanded .el-hidden{display:inline-flex!important}
@@ -1702,7 +1704,7 @@ const MENUS = {
 const KEY='fitness_workbench_v2';
 let state=load();
 // 强制缓存更新：版本变化时清除所有 sw 缓存并硬刷新
-const APP_VER='43';
+const APP_VER='44';
 if(localStorage.getItem('app_ver')!==APP_VER){
   localStorage.setItem('app_ver',APP_VER);
   if('caches' in window)caches.keys().then(n=>{n.forEach(c=>{if(c.includes('fitness-workbench'))caches.delete(c);});}).then(()=>location.reload(true));
@@ -4627,7 +4629,7 @@ function renderExLib(){
   const TH=8;
   lib.forEach((e,idx)=>{
     const item=document.createElement('div');item.className='el-item'+(idx>=TH?' el-hidden':'');
-    item.innerHTML='<span>'+e.name+'</span><span class="el-chart" title="进步曲线">📊</span><span class="el-add" title="记录今日">＋</span>';
+    item.innerHTML='<span>'+e.name+'</span><span class="el-chart" title="进步曲线">📊</span><span class="el-add" title="记录今日">＋</span><span class="el-del" title="删除动作">🗑</span>';
     item.querySelector('.el-add').onclick=()=>{
       let perf;
       if(e.detail&&e.detail.length){
@@ -4642,6 +4644,13 @@ function renderExLib(){
     };
     const chartBtn=item.querySelector('.el-chart');
     if(chartBtn)chartBtn.onclick=()=>showProgressChart(e.name);
+    const delBtn=item.querySelector('.el-del');
+    if(delBtn)delBtn.onclick=()=>{
+      if(!confirm('删除「'+e.name+'」呢个动作？（只删动作库，不影响已记录嘅训练）'))return;
+      const i=profile().exLib.indexOf(e);
+      if(i>=0)profile().exLib.splice(i,1);
+      save();renderExLib();
+    };
     el.appendChild(item);
   });
   if(lib.length>TH){

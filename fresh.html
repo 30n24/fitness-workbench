@@ -753,6 +753,8 @@ html.dark .dash-card{background:#171f30}
 .ai-head{font-size:16px;font-weight:800;display:flex;justify-content:space-between;align-items:center}
 .ai-close{color:var(--muted);font-size:18px;cursor:pointer;width:28px;height:28px;display:flex;align-items:center;justify-content:center}
 .ai-tip{font-size:12px;color:var(--muted);line-height:1.6;margin:10px 0 14px}
+.ai-tip a{color:var(--accent);text-decoration:underline;font-weight:600}
+.ai-sec{font-size:12px;font-weight:800;color:var(--accent);margin:2px 0 2px;letter-spacing:.3px}
 .ai-box label{display:block;font-size:12px;color:var(--muted);margin:10px 0 4px}
 .ai-box select,.ai-box input{width:100%;height:42px;border-radius:10px;border:1px solid var(--border);background:var(--bg-2);color:var(--text);font-size:14px;padding:0 12px}
 .ai-actions{display:flex;gap:8px;margin-top:16px}
@@ -817,22 +819,27 @@ html.dark .dash-card{background:#171f30}
   </div>
   <div class="ai-modal" id="aiModal">
     <div class="ai-box">
-      <div class="ai-head">🤖 AI 联网查热量 <span class="ai-close" id="aiClose">✕</span></div>
-      <div class="ai-tip">配置你自己的 AI Key（仅存本机浏览器，不会写入任何公开文件）。识别不到的食物，在饮食页点「🔍AI」即可联网查询并自动填入与保存。</div>
-      <label>服务商</label>
-      <select id="aiProvider">
-        <option value="deepseek">DeepSeek（便宜推荐）</option>
-        <option value="openai">OpenAI</option>
-        <option value="custom">自定义（兼容 OpenAI 格式）</option>
-      </select>
-      <label>API Key</label>
-      <input type="password" id="aiKey" placeholder="sk-..." autocomplete="off">
-      <label>接口地址</label>
-      <input type="text" id="aiBase" placeholder="https://api.deepseek.com/v1">
-      <label>模型名</label>
-      <input type="text" id="aiModel" placeholder="deepseek-chat">
-      <label style="margin-top:10px">USDA 营养库 Key（可选·免费·提升准确度）</label>
-      <input type="password" id="aiUsda" placeholder="留空用 DEMO_KEY（限流），可到 fdc.nal.usda.gov 免费申请" autocomplete="off">
+    <div class="ai-head">🤖 AI 联网查热量 <span class="ai-close" id="aiClose">✕</span></div>
+    <div class="ai-tip">查热量顺序：<b>本地库 → USDA 营养库 → AI</b>。生鲜/英文食材名 USDA 已覆盖（<b>不填 Key 也能查</b>）；只有 USDA 查不到的中式品牌/菜品，才需要下面的 AI Key。</div>
+
+    <div class="ai-sec">① AI 配置（专查中式品牌/菜品，如「柠C气泡美式」「麻婆豆腐」）</div>
+    <label>服务商</label>
+    <select id="aiProvider">
+      <option value="deepseek">DeepSeek（便宜推荐）</option>
+      <option value="openai">OpenAI</option>
+      <option value="custom">自定义（兼容 OpenAI 格式）</option>
+    </select>
+    <label>API Key（AI 用）</label>
+    <input type="password" id="aiKey" placeholder="sk-...（DeepSeek / OpenAI）" autocomplete="off">
+    <label>接口地址</label>
+    <input type="text" id="aiBase" placeholder="https://api.deepseek.com/v1">
+    <label>模型名</label>
+    <input type="text" id="aiModel" placeholder="deepseek-chat">
+
+    <div class="ai-sec" style="margin-top:12px">② USDA 营养库 Key（可选 · 提升准确度）</div>
+    <label>USDA Key</label>
+    <input type="password" id="aiUsda" placeholder="留空即用免费 DEMO_KEY（有频次上限）" autocomplete="off">
+    <div class="ai-tip" style="margin-top:6px">不填也能查（默认用 USDA 免费 DEMO_KEY）。想去掉频次限制：到 <a href="https://fdc.nal.usda.gov/api-key-signup.html" target="_blank" rel="noopener" style="color:var(--accent);text-decoration:underline">fdc.nal.usda.gov 免费申请</a> 一个 Key 贴这里即可（邮箱注册，秒发）。</div>
       <div class="ai-actions">
         <button class="ai-save" id="aiSave">保存</button>
         <button class="ai-test" id="aiTest">测试</button>
@@ -1009,7 +1016,7 @@ html.dark .dash-card{background:#171f30}
     <div class="cf-list" id="cfList"></div>
   </div>
 
-  <div class="ai-tip">💡 冇收录嘅食物？喺输入框打名后点右侧 <b>🔍AI</b> 联网查热量（首次需到「数据管理 → 🤖 AI 查热量」填 Key）</div>
+  <div class="ai-tip">💡 冇收录嘅食物？输入框打名后点右侧 <b>🔍AI</b> 联网查热量。生鲜/英文食材名 USDA 直接查（唔使 Key）；只有中式品牌/菜品先需要去「数据管理 → 🤖 AI 查热量」填 AI Key。</div>
   <div class="section-title">🍳 早餐（自主输入）</div>
   <div class="meal-input-card">
     <div class="meal-row">
@@ -1680,7 +1687,7 @@ const MENUS = {
 const KEY='fitness_workbench_v2';
 let state=load();
 // 强制缓存更新：版本变化时清除所有 sw 缓存并硬刷新
-const APP_VER='24';
+const APP_VER='25';
 if(localStorage.getItem('app_ver')!==APP_VER){
   localStorage.setItem('app_ver',APP_VER);
   if('caches' in window)caches.keys().then(n=>{n.forEach(c=>{if(c.includes('fitness-workbench'))caches.delete(c);});}).then(()=>location.reload(true));
@@ -4210,7 +4217,11 @@ async function aiLookupFood(raw,kind,inputId){
     if(u.ok){ showFoodHint('🌿 USDA 权威库：'+u.name+' ≈ '+u.cal+'kcal / '+u.carb+'g碳'+(u.note?('（'+u.note+'）'):'')); return; }
   }catch(e){}
   // 3) 本地库 + USDA 都没命中 → 才调 AI（中式品牌/菜品/复杂描述）
-  if(!hasAI){ showFoodHint('USDA 也查不到：去「数据管理 → 🤖 AI 查热量」填 Key，或填 USDA Key 提升覆盖'); openAiCfg(); return; }
+  if(!hasAI){
+    if(u&&u.reason&&/^net/.test(u.reason)) showFoodHint('🌿 USDA 限流/网络异常：稍后再试，或到「数据管理 → 🤖 AI 查热量」填 USDA Key 提升覆盖');
+    else showFoodHint('🌿 USDA 查无此食物：中式品牌/菜品请到「数据管理 → 🤖 AI 查热量」填 AI Key 再查');
+    openAiCfg(); return;
+  }
   showFoodHint('🔍 正在用 AI 查询「'+raw+'」热量…');
   try{
     const sys=`你是专业营养师，依据《中国食物成分表》第6版及主流连锁品牌的官方营养数据估算。用户给你一个食物描述（可能含份量/做法/口语/品牌/糖度。

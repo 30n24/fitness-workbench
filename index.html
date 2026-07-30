@@ -1678,7 +1678,7 @@ const MENUS = {
 const KEY='fitness_workbench_v2';
 let state=load();
 // 强制缓存更新：版本变化时清除所有 sw 缓存并硬刷新
-const APP_VER='20';
+const APP_VER='21';
 if(localStorage.getItem('app_ver')!==APP_VER){
   localStorage.setItem('app_ver',APP_VER);
   if('caches' in window)caches.keys().then(n=>{n.forEach(c=>{if(c.includes('fitness-workbench'))caches.delete(c);});}).then(()=>location.reload(true));
@@ -1698,7 +1698,7 @@ function recKey(){const d=curRecDate;return `${d.getFullYear()}-${String(d.getMo
 function isRecToday(){return recKey()===todayKey();}
 function recDayLabel(){const wk=['日','一','二','三','四','五','六'];const d=curRecDate;return isRecToday()?'今日':(d.getMonth()+1)+'月'+d.getDate()+'日 周'+wk[d.getDay()];}
 // 切换记录日期后刷新相关视图（训练/饮食/有氧/饮水/羽毛球）
-function applyRecDate(){updateRecDateBar();renderTopbar();renderCheckinBtn();renderParts();renderExercises();renderBadminton();renderCardio();renderCalorieSummary();renderCustomEx();renderExLib();renderExParts();renderWater();if(curPage==='diet')renderDiet();setTimeout(renderCheckinBtn,0);}
+function applyRecDate(){updateRecDateBar();renderTopbar();renderCheckinBtn();renderParts();renderExercises();renderBadminton();renderCardio();renderCalorieSummary();renderCustomEx();renderExLib();renderExParts();renderWater();if(curPage==='diet')renderDiet();if(curPage==='expenses'){curExpDate=new Date(curRecDate);renderExpenses();}setTimeout(renderCheckinBtn,0);}
 function shiftRecDate(n){curRecDate.setDate(curRecDate.getDate()+n);applyRecDate();}
 function resetRecDate(){curRecDate=new Date();applyRecDate();}
 function setRecDate(y,m,d){curRecDate=new Date(y,m-1,d);applyRecDate();}
@@ -3004,7 +3004,7 @@ function switchPage(p){
   if(p==='diet'){renderDiet();renderCustomFood();}
   if(p==='body'){renderBody();renderMeta();}
   if(p==='stats')renderStats();
-  if(p==='expenses')renderExpenses();
+  if(p==='expenses'){curExpDate=new Date(curRecDate);renderExpenses();}
   if(p==='photos')renderPhotos();
   renderWater(); // 每次切页更新饮水卡片（目标按体重动态变化）
   window.scrollTo(0,0);

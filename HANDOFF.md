@@ -1,0 +1,144 @@
+# 健身计划工作台（fitness-workbench）续接说明
+
+> 用途：新开任务会话时，把本文件内容贴给 AI，它即可无缝衔接，不必重新了解项目。
+> 最后更新：v35（2026-07-30）。代码托管：GitHub Pages `30n24/fitness-workbench`。
+
+---
+
+## 1. 项目是什么
+
+一个**单文件 PWA 健身计划工作台**，给两个人（计划 A / 计划 B）做训练 + 饮食 + 碳循环记录。
+核心诉求（用户原话风格的要点）：
+
+- 饮食登记**忠实于用户输入**：用户输入什么文字，餐名就显示什么（如「半碗米饭」「番薯半斤」「瑞幸百香果美式不另外加糖」），但热量/碳水要按量词**精确计算**。
+- **碳循环控制**是重点：需要每天碳水摄入量统计，且能自主修正。
+- 品牌风味饮料（瑞幸/库迪等）品类极多（果味美式、风味拿铁、椰系、果茶），且有「不另外加糖/微甜/少甜/七分糖/标准糖」等甜度分级，必须精确识别计算。
+
+---
+
+## 2. 文件结构（/workspace/deploy/）
+
+| 文件 | 作用 |
+|------|------|
+| `index.html` | **主程序**，单文件含全部 HTML/CSS/JS，约 3400+ 行。改功能只改这里。 |
+| `fresh.html` / `wb.html` | `index.html` 的同步副本。**每次改完 index.html 必须 `cp index.html fresh.html && cp index.html wb.html`**。 |
+| `sw.js` | Service Worker。`CACHE_NAME` 需与 `index.html` 里的 `APP_VER` 同步递增。 |
+| `manifest.webmanifest` / 图标 | PWA 安装资源，一般不动。 |
+
+**版本号铁律**：改 `index.html` 后
+1. `index.html` 内 `const APP_VER='NN';`（约 1692 行）递增；
+2. `sw.js` 内 `const CACHE_NAME='fitness-workbench-vNN';`（第 3 行）同步递增；
+3. `cp index.html fresh.html && cp index.html wb.html`；
+4. 提交并 `git push`（仓库 `30n24/fitness-workbench`，分支 `main`）。
+
+`APP_VER` 变更会触发 `localStorage` 比对 → 清除旧 SW 缓存 → `location.reload(true)`，强制手机拉取新文件。
+
+---
+
+## 3. 关键架构与已落地的设计
+
+### 3.1 食物热量/碳水三级查找（matchFoodCal 等）
+1. **本地 `FOOD_DB`**（约 3095–3157 行）：每项含 `cal`（每 100g 热量）与 `carb`（每 100g 碳水）。生鲜/常见食材走这里。
+2. **USDA 直查** `usdaLookupFood`：英文/生鲜食材名，无需 API Key。
+3. **AI 查** `aiLookupFood`：仅中式品牌/菜品需要「数据管理 → 🤖 AI 查热量」填的 AI Key。
+
+> 链路是**短路式**：本地命中就不走网络。测试时屏蔽 `api.github.com` / `api.nal.usda.gov` / `fdc.nal.usda.gov` 可强制走本地路径。
+
+### 3.2 忠实登记（v32 确立）
+所有登记路径（本地/品牌饮料/USDA/AI）统一把 `raw.trim()` 存为餐名 `name`；别名只用于查热量/碳水，**不**改写显示名。
+- `registerMeal(kind,name,cal,carb,inputId)`：把 `{name,cal,carb,matched:name}` 推入当日记录并重渲染。
+- 餐项已显示碳水：`<span class="md">${it.carb}g碳</span>`。
+
+### 3.3 品牌风味饮料甜度插值（resolveSugarDrink）
+`FLAVORED_DRINKS` 表每项给两个锚点：`cal0/carb0`（不另外加糖）与 `cal1/carb1`（标准糖），甜度系数 `f` 插值：
+- `不另外加糖=0`｜`微甜/少少甜/三分糖=0.25`｜`半糖/少甜/少糖/五分糖=0.5`｜`七分糖=0.7`｜`标准糖/全糖=1`（默认）
+- 杯型：`小0.8/中1/大1.2/超大1.4`；支持数量倍乘 `qty`。
+- **通用兜底**：未在表里的「果味美式/风味拿铁/果茶」按品类正则（`FLAVOR_RE`/`FRUIT_RE`）估算，标「·通用估算」。
+- 品牌无关：靠饮料名子串匹配，瑞幸/库迪/星巴克等都覆盖。
+
+### 3.4 量词解析（matchFoodCal）
+支持**前缀量词**（`半碗米饭`）与**尾随量词**（`番薯半斤`、`2个鸡蛋 250ml牛奶`）。`cnNumToArabic` 处理中文数字。
+
+### 3.5 碳水统计（v33 + v35，本次重点）
+- **每餐小计**：`renderMeal` 末尾 `合计 ${total}kcal · ${totalCarb}g碳`。
+- **底部汇总**：`renderDietSummary`「今日饮食汇总」卡片含逐餐 `kcal · g碳`，并新增高亮行 **「今日总碳水 Xg」**（绿色）。
+- **顶部实时读数**（v35 新增）：饮食页顶部碳水循环区下方 `dietCarbNow` 显示大字号 `🍚 今日碳水 Xg` + 低碳/高碳标签，**进来第一眼可见**，解决移动端长页面底部汇总被忽略的问题。
+- **自主修正（✎）含碳水**（v33）：点 ✎ 先弹「修正热量(kcal)」再弹「修正碳水(g)」，两步独立，任一步取消不影响另一步。
+
+---
+
+## 4. 已实现的版本脉络
+
+| 版本 | 内容 |
+|------|------|
+| v27–v32 | 风味饮料甜度精确识别；瑞幸全品类覆盖；忠实登记（名=输入）；量词精确计算 |
+| v33 | 每日碳水统计（每餐+全天）+ ✎碳水修正 |
+| v34 | 移除顶/底栏 `backdrop-filter:blur` 降低手机发热（毛玻璃每帧重绘是发热主因） |
+| v35 | 饮食页顶部新增醒目「今日碳水」实时读数 |
+| v36 | 动作库/食物库超长自动折叠（>8 项折叠，点「展开全部 N」展开）；顺带修复进训练页动作库空白的潜在 bug |
+
+---
+
+## 5. 测试方式（验证改动用）
+
+真实浏览器 Playwright + Chromium，阻断外部接口走本地链路：
+```bash
+cd /workspace/deploy
+python3.11 -m http.server 8123 &          # 起静态服务
+NODE_PATH=/workspace/deploy/node_modules node 你的测试.js
+```
+测试脚本要点：`page.route` 屏蔽 `**/api.github.com/**`、`**/api.nal.usda.gov/**`、`**/fdc.nal.usda.gov/**`；
+加载后等 `#appLoader` 变 `hidden`，再点 `.profile-card[data-profile="A"]` → `button[data-page="diet"]`。
+历史测试：`/tmp/strict_test.js`（名字保真 11 例）、`/tmp/carb_test.js`（碳水统计+修正）。
+
+---
+
+## 6. 仍未做 / 用户曾提过但未要求实现的项
+
+- **「重新计算历史记录」**：用户之前提过、但未明确要，未实现。
+- **把「数据管理」按钮移到主页**：用户提过，未实现。
+- **可选性能项**（v34 诊断时发现，未改以免过度）：
+  - 常驻 `infinite` CSS 动画（`ciPulse`/`moonPulse`/`zzz`/`waterPulse`）持续耗电；
+  - 云同步 `setInterval` 每 30s（登录云同步后）；
+  - `renderDiet` 每次重建数百个 `<option>` 的 `foodList` datalist（可缓存）。
+- **碳水目标值**：当前只显示总量与低碳/高碳标签，未设每日碳水上限/下限参考线。
+
+---
+
+## 7. 新会话对接速记（直接复制给 AI）
+
+> 我在做 `/workspace/deploy` 里的单文件 PWA 健身工作台 `健身计划工作台`（GitHub Pages `30n24/fitness-workbench`）。
+> 主文件 `index.html`，改完要同步 `fresh.html`/`wb.html`、`sw.js`（CACHE_NAME）并把 `index.html` 内 `APP_VER` 一起 +1 后 `git push`。
+> 设计铁律：饮食登记餐名=用户输入原文（忠实登记），热量/碳水按量词精确算；品牌风味饮料用甜度插值（FLAVORED_DRINKS 锚点 + 通用兜底）；三级查找 FOOD_DB→USDA→AI。
+> 已做：v33 碳水统计（每餐+全天+✎碳水修正）、v34 去毛玻璃降发热、v35 顶部「今日碳水」实时读数、v36 动作库/食物库超长自动折叠（>8项折叠点击展开）+ 修复进训练页动作库空白。
+> 测试用 Playwright 起 `python3.11 -m http.server 8123`，屏蔽外网接口走本地链路。
+> 当前诉求背景：碳循环控制，每日碳水统计最重要。请先读 `HANDOFF.md` 与 `index.html` 相关函数再动手。
+
+---
+
+## 8. 如何对接新会话（无缝衔接方法）
+
+**前提**：新会话的 AI 没有跨会话记忆，开场即空白。必须在新对话第一条消息里把上下文喂给它，它才会"知道过往"。
+
+**推荐做法（二选一，优先 A）**：
+
+### A. 直接粘贴下方「开场白」到新对话第一条消息
+> 复制 §7 的对接速记全文，或整段 HANDOFF.md，作为新对话首条消息发过去即可。
+> 若新会话能访问同一文件系统，可让 AI 先 `Read /workspace/HANDOFF.md`；若文件不存在（全新沙箱），则必须粘贴内容。
+
+### B. 让新 AI 自己读代码 + git 历史（最可靠，不依赖文档）
+新对话首条消息写：
+> 我在做 `/workspace/deploy` 的健身工作台 PWA（GitHub Pages `30n24/fitness-workbench`）。请先 `git log --oneline -20` 看近期改动，再读 `HANDOFF.md`（若存在），然后等我指令。不要凭空假设，动手前先读 `index.html` 相关函数。
+
+**为什么这样能无缝**：代码 + git 提交记录才是真相源。HANDOFF.md 只是加速器；即使文档丢了，新 AI 靠 `git log` 和读 `index.html` 也能还原全部背景。
+
+**保持文档新鲜**：每完成一轮调整，让 AI 顺手把 HANDOFF.md 的版本表（§4）与对接速记（§7）更新到当前版本号，避免下次对接时信息滞后。
+
+### 新对话开场白（直接复制）
+```
+继续做健身工作台 PWA（/workspace/deploy，GitHub Pages 30n24/fitness-workbench）。
+主文件 index.html；改完要同步 fresh.html/wb.html、sw.js(改 CACHE_NAME) 并把 index.html 内 APP_VER 一起+1 后 git push。
+设计铁律：饮食登记餐名=用户输入原文（忠实登记），热量/碳水按量词精确算；品牌风味饮料用甜度插值（FLAVORED_DRINKS 锚点+通用兜底）；三级查找 FOOD_DB→USDA→AI。
+已做：v33 碳水统计（每餐+全天+✎碳水修正）、v34 去毛玻璃降发热、v35 顶部「今日碳水」实时读数、v36 动作库/食物库超长自动折叠(>8项折叠点击展开)+修复进训练页动作库空白。
+先 git log 看最新改动并读 HANDOFF.md（若存在），动手前先读 index.html 相关函数。当前诉求：碳循环控制，每日碳水统计最重要。
+```

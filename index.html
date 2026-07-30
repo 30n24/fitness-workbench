@@ -1705,7 +1705,7 @@ const MENUS = {
 const KEY='fitness_workbench_v2';
 let state=load();
 // 强制缓存更新：版本变化时清除所有 sw 缓存并硬刷新
-const APP_VER='48';
+const APP_VER='49';
 if(localStorage.getItem('app_ver')!==APP_VER){
   localStorage.setItem('app_ver',APP_VER);
   if('caches' in window)caches.keys().then(n=>{n.forEach(c=>{if(c.includes('fitness-workbench'))caches.delete(c);});}).then(()=>location.reload(true));
@@ -3280,6 +3280,25 @@ function cnNumToArabic(s){
 const _NUM_RE=/^([0-9]+(?:\.[0-9]+)?|[一二三四五六七八九十百零两双半几数俩]+)/;
 const _MW_RE=/^[个只根条片碗杯块份把颗粒串瓣g克毫升ml两斤]+/i;
 const _CONN_RE=/[炒蒸煮拌烧烤煎炖炸卤凉拼配和与大份小加另及、，,与]+/;
+/* 分数份量解析：支持 阿拉伯分数(1/4,2/3)、中文分数(三分一/三分之一/二分一)、unicode(½¼⅓)、半、整数/小数
+   返回 {qty,end,explicit}，end 为已消费到的字符位置；训练只解析一次，避免各页各算各的 */
+const _FRAC_RE=/^(\d+(?:\.\d+)?)\/(\d+(?:\.\d+)?)/;
+const _UNI_FRAC={'½':0.5,'¼':0.25,'⅓':1/3,'¾':0.75,'⅔':2/3,'⅛':0.125,'⅜':0.375,'⅝':0.625,'⅞':0.875,'⅕':0.2,'⅖':0.4,'⅙':1/6,'⅚':5/6};
+const _CN_FRAC_RE=/^([一二三四五六七八九十]+)分(之)?([一二三四五六七八九十半]+)/;
+function parseLeadingQty(s,i){
+  const slice=s.slice(i);
+  let m=slice.match(_FRAC_RE);
+  if(m){ const num=parseFloat(m[1]),den=parseFloat(m[2]); if(den>0&&num>0&&num/den<100) return {qty:num/den,end:i+m[0].length,explicit:true}; }
+  if(slice[0]==='半') return {qty:0.5,end:i+1,explicit:true};
+  if(slice.startsWith('一半')) return {qty:0.5,end:i+2,explicit:true};
+  const ch0=slice[0];
+  if(ch0!==undefined&&(ch0 in _UNI_FRAC)) return {qty:_UNI_FRAC[ch0],end:i+1,explicit:true};
+  const cf=slice.match(_CN_FRAC_RE);
+  if(cf){ const den=cnNumToArabic(cf[1]),num=cnNumToArabic(cf[3]); if(den>0&&den<=20&&num>0&&num/den<100) return {qty:num/den,end:i+cf[0].length,explicit:true}; }
+  const nm=slice.match(_NUM_RE);
+  if(nm){ const v=cnNumToArabic(nm[1]); if(!isNaN(v)&&v>0) return {qty:v,end:i+nm[0].length,explicit:true}; }
+  return {qty:1,end:i,explicit:false};
+}
 function matchFoodCal(text){
   text=(text||'').trim();
   if(!text)return {cal:0,carb:0,matched:'',fuzzy:true,parts:[]};
@@ -3288,10 +3307,10 @@ function matchFoodCal(text){
   while(i<text.length){
     const ch=text[i];
     if(/\s|[，,、;；:：.。·]/.test(ch)){i++;continue;}
-    // 1) 数量前缀（中文或阿拉伯）
+    // 1) 数量前缀（中文/阿拉伯/分数：1/4、三分一、½…）
     let qty=1,explicit=false,j=i;
-    const nm=text.slice(i).match(_NUM_RE);
-    if(nm){const v=cnNumToArabic(nm[1]);if(!isNaN(v)){qty=v;explicit=true;j=i+nm[0].length;}}
+    const pq=parseLeadingQty(text,i);
+    qty=pq.qty;explicit=pq.explicit;j=pq.end;
     // 2) 量词
     let mw=null;
     const mm=text.slice(j).match(_MW_RE);
@@ -3309,30 +3328,32 @@ function matchFoodCal(text){
         else if(mw==='斤') amount=qty*500;                           // 斤=500g
         else if(mw) amount=qty*100;                                  // 碗/块/片/个…≈100g/份
         else amount=explicit?qty:100;                                // 裸数字=克；无数量=默认100g
-        realQty=amount+'g';
+        realQty=Math.round(amount)+'g';
       }else{
         amount=qty; realQty=qty+(best.u||'');                        // 计件食物
       }
-      // 后置数量（食物后跟 数字+量词，如「番薯半斤」「米饭一碗」「红薯两个」）
+      // 后置数量（食物后跟 数字/分数+量词，如「番薯半斤」「米饭一碗」「米饭1/2碗」「鸡蛋1/3」）
       let k=j+best.term.length;
-      const tn=text.slice(k).match(_NUM_RE);
-      if(tn){
-        const tv=cnNumToArabic(tn[1]);
-        if(!isNaN(tv)){
-          const k2=k+tn[0].length;
-          const tm=text.slice(k2).match(_MW_RE);
-          if(tm){
-            const tmw=tm[0];
-            if(isW){
-              let a2;
-              if(/^(g|克|毫升|ml)$/i.test(tmw)) a2=tv;
-              else if(tmw==='两') a2=tv*50;
-              else if(tmw==='斤') a2=tv*500;
-              else a2=tv*100;
-              amount=a2; realQty=a2+'g';
-            }else{ amount=tv; realQty=tv+(best.u||''); }
-            k=k2+tm[0].length;
-          }
+      const tq=parseLeadingQty(text,k);
+      if(tq.explicit){
+        const k2=tq.end;
+        const tm=text.slice(k2).match(_MW_RE);
+        if(tm){
+          const tmw=tm[0];
+          if(isW){
+            let a2;
+            if(/^(g|克|毫升|ml)$/i.test(tmw)) a2=tq.qty;
+            else if(tmw==='两') a2=tq.qty*50;
+            else if(tmw==='斤') a2=tq.qty*500;
+            else a2=tq.qty*100;
+              amount=a2; realQty=Math.round(a2)+'g';
+            }else{ amount=tq.qty; realQty=tq.qty+(best.u||''); }
+          k=k2+tm[0].length;
+        }else{
+          // 后置纯数字/分数（无后量词）：按「份」理解（重量食物按半份≈50g）
+          if(isW) amount=tq.qty*100; else amount=tq.qty;
+          realQty=isW?Math.round(tq.qty*100)+'g':(tq.qty+(best.u||''));
+          k=k2;
         }
       }
       const cal=Math.round(calcByQty(best,amount));
@@ -4256,8 +4277,8 @@ function resolveSugarDrink(raw){
   else if(/小杯/.test(raw)){size=0.8;sizeNote='小杯';}
   // 3) 数量（杯/份，仅取开头数字）
   let qty=1;
-  const qm=raw.match(/^([0-9]+(?:\.[0-9]+)?|[一二三四五六七八九十两双半])\s*(杯|份|个|瓶)?/);
-  if(qm&&qm[1]){ const v=cnNumToArabic(qm[1]); if(!isNaN(v)&&v>0&&v<=20) qty=v; }
+  const pq=parseLeadingQty(raw,0);
+  if(pq.explicit){ const rest=raw.slice(pq.end); if(/^\s*(杯|份|个|瓶)/.test(rest)||pq.qty<=20) qty=pq.qty; }
   // 4) 品牌（仅用于命名）
   let brand='';
   for(const b of SUGAR_BRANDS){ if(raw.includes(b)){brand=b;break;} }

@@ -1,7 +1,7 @@
 # 健身计划工作台（fitness-workbench）续接说明
 
 > 用途：新开任务会话时，把本文件内容贴给 AI，它即可无缝衔接，不必重新了解项目。
-> 最后更新：v38（2026-07-30）。代码托管：GitHub Pages `30n24/fitness-workbench`。
+> 最后更新：v39（2026-07-30）。代码托管：GitHub Pages `30n24/fitness-workbench`。
 
 ---
 
@@ -78,6 +78,7 @@
 | v36 | 动作库/食物库超长自动折叠（>8 项折叠，点「展开全部 N」展开）；顺带修复进训练页动作库空白的潜在 bug |
 | v37 | 修复概览页计划 B 部位分布缺失+英文（renderStats 的 partNames 对齐 PARTS_B，并兼容 classifyPart 写入的纯 key） |
 | v38 | 降发热：页面隐藏(`visibilitychange`)即暂停全部 `infinite` 动画（`app-hidden` 类）+ 停 30s 云同步定时器；`foodList` datalist 按「自定义食物签名」缓存，仅变化时重建。画面使用时完全不变 |
+| v39 | 概览页计划 B 部位分布改为列出该计划全部 5 个部位（胸/肩/背/腹/腿），含 0 次的也显示；合并 `PARTS_B` 的 `_b` 后缀 key 与 `classifyPart` 写入的纯 key 一起计数 |
 
 ---
 

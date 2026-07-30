@@ -95,7 +95,7 @@ NODE_PATH=/workspace/deploy/node_modules node 你的测试.js
 
 ## 6. 仍未做 / 用户曾提过但未要求实现的项
 
-- **🔴 代码审查待修项（2026-07-30 审查，详见 `/workspace/调整建议.md`）**：
+- **🔴 代码审查待修项（2026-07-30 本会话审查，要点如下；详细报告见本会话产出的 `调整建议.md`）**：
   - **同步并发丢数据**：`cloudPut` 遇 `409` 盲目用旧 `data` 覆盖；`syncPush`/`mergeDateField` 对数组字段按「日期键最后写入者胜」，双人双设备同时记某餐会静默丢条目。修法：409 重试改为「重新 `cloudGet` + 重新合并本地」；数组字段按条目 `id` 去重并集。
   - **热量缺口符号 bug**：`renderCalorieSummary` 缺口分支显示 `-def`（应为 `+def`），缺口时括号里写成「缺口达标 -500kcal」，与粗体 `500` 矛盾。一行修复。
   - **主训练页力量训练热量未计入每日缺口**：`exCal` 只含 cardio/badminton/customEx，`estExCal`/`estExCalFromDetail` 已就绪却没接。

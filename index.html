@@ -1701,7 +1701,7 @@ const MENUS = {
 const KEY='fitness_workbench_v2';
 let state=load();
 // 强制缓存更新：版本变化时清除所有 sw 缓存并硬刷新
-const APP_VER='36';
+const APP_VER='37';
 if(localStorage.getItem('app_ver')!==APP_VER){
   localStorage.setItem('app_ver',APP_VER);
   if('caches' in window)caches.keys().then(n=>{n.forEach(c=>{if(c.includes('fitness-workbench'))caches.delete(c);});}).then(()=>location.reload(true));
@@ -2557,7 +2557,9 @@ function renderStats(){
     const card=document.getElementById('ov'+p);
     const partNames = p==='A'?
       {chest:'胸部',shoulder:'肩部',back:'背部',abs:'腹部',legs:'腿部',rest:'休息'}:
-      {back_b:'背部',arm:'手臂',hip:'臀腿',abs_b:'核心',shoulder_b:'肩颈',rest:'休息'};
+      // B 用 _b 后缀（与 PARTS_B 一致），同时兼容 classifyPart 返回的纯 key（customEx 可能写入纯 key）
+      {back_b:'背部',shoulder_b:'肩部',legs_b:'腿部',chest_b:'胸部',abs_b:'腹部',rest:'休息',
+       back:'背部',shoulder:'肩部',legs:'腿部',chest:'胸部',abs:'腹部'};
     let partRows=Object.keys(partDays).length>0
       ? Object.entries(partDays).sort((a,b)=>b[1]-a[1]).map(([k,v])=>`<div class="ov-stat"><span class="k">${partNames[k]||k}</span><span class="v">${v}次</span></div>`).join('')
       : '<div class="ov-stat"><span class="k">暂无数据</span><span class="v">—</span></div>';

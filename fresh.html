@@ -1687,7 +1687,7 @@ const MENUS = {
 const KEY='fitness_workbench_v2';
 let state=load();
 // 强制缓存更新：版本变化时清除所有 sw 缓存并硬刷新
-const APP_VER='30';
+const APP_VER='32';
 if(localStorage.getItem('app_ver')!==APP_VER){
   localStorage.setItem('app_ver',APP_VER);
   if('caches' in window)caches.keys().then(n=>{n.forEach(c=>{if(c.includes('fitness-workbench'))caches.delete(c);});}).then(()=>location.reload(true));
@@ -3274,11 +3274,33 @@ function matchFoodCal(text){
       }else{
         amount=qty; realQty=qty+(best.u||'');                        // 计件食物
       }
+      // 后置数量（食物后跟 数字+量词，如「番薯半斤」「米饭一碗」「红薯两个」）
+      let k=j+best.term.length;
+      const tn=text.slice(k).match(_NUM_RE);
+      if(tn){
+        const tv=cnNumToArabic(tn[1]);
+        if(!isNaN(tv)){
+          const k2=k+tn[0].length;
+          const tm=text.slice(k2).match(_MW_RE);
+          if(tm){
+            const tmw=tm[0];
+            if(isW){
+              let a2;
+              if(/^(g|克|毫升|ml)$/i.test(tmw)) a2=tv;
+              else if(tmw==='两') a2=tv*50;
+              else if(tmw==='斤') a2=tv*500;
+              else a2=tv*100;
+              amount=a2; realQty=a2+'g';
+            }else{ amount=tv; realQty=tv+(best.u||''); }
+            k=k2+tm[0].length;
+          }
+        }
+      }
       const cal=Math.round(calcByQty(best,amount));
       const carb=Math.round((best.carb||0)*(isW?amount/100:amount));
       parts.push({name:best.name,qty:realQty,cal,carb});
       totalCal+=cal;totalCarb+=carb;
-      i=j+best.term.length;
+      i=k;
     } else {
       // 拆不出食物：跳过一个连接词再试（应对「番茄炒蛋」类搭配）
       if(_CONN_RE.test(ch)){ if(/[炒煎炸爆溜]/i.test(ch))cookedWithOil=true; i++;continue; }
@@ -4289,7 +4311,7 @@ async function usdaLookupFood(raw,kind,inputId){
   const grams=g.grams;
   let cal=Math.round(per100kcal*grams/100),carb=Math.round(per100carb*grams/100);
   if(cal<0)cal=0;
-  const name=(''+pick.description).split(',')[0].replace(/\braw\b/i,'生').trim()||q;
+  const name=raw.trim();
   const note=(g.note?('按'+g.note+'；'):'')+'USDA权威库';
   const r=registerMeal(kind,name,cal,carb,inputId);
   return {ok:true,name:r.name,cal,carb,note,rawName:pick.description};
@@ -4297,14 +4319,8 @@ async function usdaLookupFood(raw,kind,inputId){
 async function aiLookupFood(raw,kind,inputId){
   raw=(raw||'').trim();
   if(!raw){showFoodHint('先输入食物名称');return;}
-  // 把一次本地匹配结果登记到当前餐（库优先 / 无 Key 兜底都用它）
-  const applyLocal=(m)=>{
-    let name=m.matched||raw;
-    // 单品且带非默认份量 → 名称带上份量（如 米饭(50g) / 红薯(0.5根)），方便核对是否按比例算
-    const p=(m.parts&&m.parts.length===1)?m.parts[0]:null;
-    if(p&&p.qty&&!/^100(g|ml)$/.test(p.qty)&&!/^1(个|根|碗|杯|份|块|片)$/.test(p.qty)) name=name+'('+p.qty+')';
-    return registerMeal(kind,name,m.cal,m.carb,inputId);
-  };
+  // 按用户原话登记（不归一化别名、不整合），热量仍按份量精准计算
+  const applyLocal=(m)=>registerMeal(kind, raw.trim(), m.cal, m.carb, inputId);
   const cfg=getAICfg();
   const hasAI=!!(cfg&&cfg.key);
   // 1) 本地标准库优先（参照薄荷/MyFitnessPal：库命中即秒回，不浪费网络）
@@ -4317,15 +4333,15 @@ async function aiLookupFood(raw,kind,inputId){
   // 1.5) 品牌风味饮·糖度精准匹配（瑞幸/库迪等果味美式/风味拿铁/果茶，本地即算，不耗网络；USDA/AI 无此中文数据）
   const fd=resolveSugarDrink(raw);
   if(fd){
-    const dn=(fd.qty>1)?fd.name+' ×'+fd.qty:fd.name;
-    const r=registerMeal(kind,dn,fd.cal,fd.carb,inputId);
+    const r=registerMeal(kind, raw.trim(), fd.cal, fd.carb, inputId);
     showFoodHint('🏷️ 品牌风味饮（糖度匹配）：'+r.name+' ≈ '+r.cal+'kcal / '+r.carb+'g碳（'+fd.degree+(fd.qty>1?(' ×'+fd.qty):'')+(fd.sizeNote?(' '+fd.sizeNote):'')+(fd.generic?'·通用估算':'')+'）');
     return;
   }
   // 2) USDA 权威营养库（免费·跨域·无需 AI Key，覆盖生鲜/原料级准确度，对标市面 app）
   showFoodHint('🔍 正在用 USDA 营养库查询「'+raw+'」…');
+  let u=null;
   try{
-    const u=await usdaLookupFood(raw,kind,inputId);
+    u=await usdaLookupFood(raw,kind,inputId);
     if(u.ok){ showFoodHint('🌿 USDA 权威库：'+u.name+' ≈ '+u.cal+'kcal / '+u.carb+'g碳'+(u.note?('（'+u.note+'）'):'')); return; }
   }catch(e){}
   // 3) 本地库 + USDA 都没命中 → 才调 AI（中式品牌/菜品/复杂描述）
@@ -4393,12 +4409,12 @@ async function aiLookupFood(raw,kind,inputId){
     // 登记到当前餐
     if(!profile()[kind])profile()[kind]={};
     if(!profile()[kind][recKey()])profile()[kind][recKey()]=[];
-    profile()[kind][recKey()].push({name:food,cal,carb,matched:food});
+    profile()[kind][recKey()].push({name:raw.trim(),cal,carb,matched:raw.trim()});
     save();
     const inp=document.getElementById(inputId);if(inp)inp.value='';
     if(kind==='breakfast')renderBreakfast();else if(kind==='lunch')renderLunch();else renderDinner();
     renderDietSummary();
-    showFoodHint('✅ '+(note?('（'+note+'）'):'')+food+' ≈ '+cal+'kcal / '+carb+'g碳');
+    showFoodHint('✅ '+(note?('（'+note+'）'):'')+raw.trim()+' ≈ '+cal+'kcal / '+carb+'g碳');
   }catch(e){
     // AI 失败兜底：再试一次本地库（若恰能匹配）
     const m=matchFoodCal(raw);

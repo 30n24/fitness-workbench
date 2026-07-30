@@ -733,6 +733,12 @@ html.dark .dash-card{background:#171f30}
 .el-item .el-add{cursor:pointer;color:var(--primary);font-weight:800;font-size:17px;margin-left:2px;line-height:1}
 .el-item .el-chart{cursor:pointer;font-size:14px;line-height:1;margin-left:2px}
 .el-empty{font-size:12px;color:var(--muted);text-align:center;padding:6px 0;width:100%}
+.ex-lib-list .el-hidden{display:none!important}
+.ex-lib-list.expanded .el-hidden{display:inline-flex!important}
+.ex-lib-list .lib-toggle{flex-basis:100%;text-align:center;font-size:12px;color:var(--primary);font-weight:600;padding:7px 0;margin-top:2px;cursor:pointer}
+.custom-food .cf-list .cf-hidden{display:none!important}
+.custom-food .cf-list.expanded .cf-hidden{display:flex!important}
+.custom-food .cf-list .lib-toggle{text-align:center;font-size:12px;color:var(--primary);font-weight:600;padding:7px 0;margin-top:3px;border:1px dashed var(--border);border-radius:8px;cursor:pointer}
 /* ===== 自定义动作 + AI 计卡 ===== */
 .custom-ex-card{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:14px;margin:14px 2px 0}
 .custom-ex-card .meal-row{display:flex;gap:8px;align-items:center}
@@ -1695,7 +1701,7 @@ const MENUS = {
 const KEY='fitness_workbench_v2';
 let state=load();
 // 强制缓存更新：版本变化时清除所有 sw 缓存并硬刷新
-const APP_VER='35';
+const APP_VER='36';
 if(localStorage.getItem('app_ver')!==APP_VER){
   localStorage.setItem('app_ver',APP_VER);
   if('caches' in window)caches.keys().then(n=>{n.forEach(c=>{if(c.includes('fitness-workbench'))caches.delete(c);});}).then(()=>location.reload(true));
@@ -2780,7 +2786,7 @@ function showDayPopup(key,anchor,mode){
 function hideDayPopup(){const p=document.getElementById('dayPopup');if(p)p.classList.remove('show');window._dpPin=false;}
 
 function renderAll(){
-  renderTopbar();renderParts();renderExercises();renderBadminton();renderCardio();renderCalorieSummary();renderWater();renderWeekGrid('weekGrid');renderCheckinBtn();
+  renderTopbar();renderParts();renderExercises();renderBadminton();renderCardio();renderCalorieSummary();renderWater();renderWeekGrid('weekGrid');renderCheckinBtn();renderExLib();
 }
 
 /* ===== 打卡（核心修复：写入 partChecked） ===== */
@@ -3019,6 +3025,7 @@ function switchPage(p){
     if(b.dataset.page===p){b.classList.add('active');b.classList.add(curProfile==='A'?'pA':'pB')}
   });
   if(p==='diet'){renderDiet();renderCustomFood();}
+  if(p==='train'){renderExLib();}
   if(p==='body'){renderBody();renderMeta();}
   if(p==='stats')renderStats();
   if(p==='expenses'){curExpDate=new Date(curRecDate);renderExpenses();}
@@ -3589,12 +3596,19 @@ function renderCustomFood(){
   const foods=profile().foods||[];
   list.innerHTML='';
   if(!foods.length){list.innerHTML='<div style="font-size:11px;color:var(--muted)">暂无自定义食物，添加后参与热量匹配</div>';return;}
+  const TH=8;
   foods.forEach((f,i)=>{
-    const div=document.createElement('div');div.className='cf-item';
+    const div=document.createElement('div');div.className='cf-item'+(i>=TH?' cf-hidden':'');
     div.innerHTML=`<span>${f.n} · ${f.cal}kcal/${f.u}</span><span class="cf-del" data-i="${i}">✕</span>`;
     div.querySelector('.cf-del').onclick=()=>{const a=profile().foods||[];a.splice(i,1);profile().foods=a;save();renderCustomFood();if(curPage==='diet')renderDiet();};
     list.appendChild(div);
   });
+  if(foods.length>TH){
+    const t=document.createElement('div');t.className='lib-toggle';
+    t.textContent='展开全部 '+foods.length+' 种食物 ▾';
+    t.onclick=()=>{const c=list.classList.toggle('expanded');t.textContent=c?'收起 ▴':'展开全部 '+foods.length+' 种食物 ▾';};
+    list.appendChild(t);
+  }
 }
 
 /* 身体数据 */
@@ -4591,8 +4605,9 @@ function renderExLib(){
   const lib=profile().exLib||[];
   if(!lib.length){el.innerHTML='<div class="el-empty">仲未记录过动作。喺上面打「动作＋组数次数重量」记录一次就会出现喺呢度 💡</div>';return;}
   el.innerHTML='';
-  lib.forEach(e=>{
-    const item=document.createElement('div');item.className='el-item';
+  const TH=8;
+  lib.forEach((e,idx)=>{
+    const item=document.createElement('div');item.className='el-item'+(idx>=TH?' el-hidden':'');
     item.innerHTML='<span>'+e.name+'</span><span class="el-chart" title="进步曲线">📊</span><span class="el-add" title="记录今日">＋</span>';
     item.querySelector('.el-add').onclick=()=>{
       let perf;
@@ -4610,6 +4625,12 @@ function renderExLib(){
     if(chartBtn)chartBtn.onclick=()=>showProgressChart(e.name);
     el.appendChild(item);
   });
+  if(lib.length>TH){
+    const t=document.createElement('div');t.className='lib-toggle';
+    t.textContent='展开全部 '+lib.length+' 个动作 ▾';
+    t.onclick=()=>{const c=el.classList.toggle('expanded');t.textContent=c?'收起 ▴':'展开全部 '+lib.length+' 个动作 ▾';};
+    el.appendChild(t);
+  }
 }
 function renderCustomEx(){
   const el=document.getElementById('customExList'); if(!el)return;

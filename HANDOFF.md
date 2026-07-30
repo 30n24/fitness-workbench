@@ -1,7 +1,7 @@
 # 健身计划工作台（fitness-workbench）续接说明
 
 > 用途：新开任务会话时，把本文件内容贴给 AI，它即可无缝衔接，不必重新了解项目。
-> 最后更新：v44（2026-07-30）。代码托管：GitHub Pages `30n24/fitness-workbench`。
+> 最后更新：v45（2026-07-30）。代码托管：GitHub Pages `30n24/fitness-workbench`。
 
 ---
 
@@ -84,6 +84,7 @@
 | v42 | 动作重量支持 kg/磅(lb)/斤 单位：解析识别单位、内部统一转 kg 算热量（含金字塔/递减序列正确换算，修「斤」漏换算 bug），但**保存并显示原始单位**（如「45lb」「30斤」），新增动作库也记单位；旧数据无单位回退显示 kg |
 | v43 | 修复选人页自定义称呼：之前只在点卡片进 App 时才落盘，填了没进/没上传一更新重进就丢；改为 `oninput` 即时写 `state.x.name` 并 `saveLocal()`，重载/版本更新都能还原；上传交 30s 定时同步（不每键推云端） |
 | v44 | 新增「我的动作库」删除功能：每个动作项加红色 🗑 按钮，点按 `confirm` 后从 `exLib` 移除并重渲染（只删动作库，不影响已记录的训练）；配 `.el-del` 样式 |
+| v45 | 修复冷启动（退出后台杀进程再重开）今日已训练记录不显示：根因 `enterApp()` 调 `renderAll()` 但旧 `renderAll()` 漏了 `renderCustomEx()`/`renderExParts()`（这两只在日期翻页的 `applyRecDate()` 里），导致冷启动没画今日训练列表与 5 部位视图，翻日才触发显示。现把 `renderCustomEx();renderExParts();` 补进 `renderAll()`，冷启动即渲染今日记录 |
 
 ---
 

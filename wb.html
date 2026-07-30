@@ -1704,7 +1704,7 @@ const MENUS = {
 const KEY='fitness_workbench_v2';
 let state=load();
 // 强制缓存更新：版本变化时清除所有 sw 缓存并硬刷新
-const APP_VER='44';
+const APP_VER='45';
 if(localStorage.getItem('app_ver')!==APP_VER){
   localStorage.setItem('app_ver',APP_VER);
   if('caches' in window)caches.keys().then(n=>{n.forEach(c=>{if(c.includes('fitness-workbench'))caches.delete(c);});}).then(()=>location.reload(true));
@@ -2790,7 +2790,7 @@ function showDayPopup(key,anchor,mode){
 function hideDayPopup(){const p=document.getElementById('dayPopup');if(p)p.classList.remove('show');window._dpPin=false;}
 
 function renderAll(){
-  renderTopbar();renderParts();renderExercises();renderBadminton();renderCardio();renderCalorieSummary();renderWater();renderWeekGrid('weekGrid');renderCheckinBtn();renderExLib();
+  renderTopbar();renderParts();renderExercises();renderBadminton();renderCardio();renderCalorieSummary();renderWater();renderWeekGrid('weekGrid');renderCheckinBtn();renderExLib();renderCustomEx();renderExParts();
 }
 
 /* ===== 打卡（核心修复：写入 partChecked） ===== */

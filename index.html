@@ -4046,7 +4046,32 @@ async function aiLookupFood(raw,kind,inputId){
   if(!cfg||!cfg.key){showFoodHint('未配置 AI：去「数据管理 → 🤖 AI 查热量」填写 Key');openAiCfg();return;}
   showFoodHint('🔍 正在用 AI 查询「'+raw+'」热量…');
   try{
-    const sys='你是专业营养师。用户给你一个食物描述（可能含份量/做法/口语）。若用户提到份量、重量或碗数，请按佢讲嘅实际份量估算；若冇提，就按「一份典型分量」估。请输出 JSON：{"cal":数字,"carb":数字,"unit":"份","food":"规范中文食物名（去口语/品牌/描述，例如『牛肉面加卤蛋』回『牛肉面+卤蛋』、『一碗猪脚饭』回『猪脚饭』）","note":"简短中文说明"}，唔好有任何多余文字。';
+    const sys=`你是专业营养师，依据《中国食物成分表》第6版及主流连锁品牌的官方营养数据估算。用户给你一个食物描述（可能含份量/做法/口语/品牌/糖度）。
+
+【份量默认（用户没明说时按此估）】
+- 鸡蛋：1 个 ≈ 50g（去壳约 45g），≈ 72kcal
+- 米饭：1 份 = 1 碗 ≈ 150g 熟米，≈ 174kcal
+- 面条/米粉：1 份 ≈ 100g 熟面，≈ 110kcal
+- 主食/菜肴：1 份 ≈ 100g
+- 水果：1 份 = 1 个中等 ≈ 150g
+- 饮料/咖啡/茶/气泡水：1 份 = 1 中杯 ≈ 500ml（瓶装按 500ml）
+- 奶茶/拿铁/果茶（连锁）：按该品牌中杯标准糖的标准配方
+- 坚果：1 份 ≈ 30g
+- 肉/水产：1 份 ≈ 100g 生重
+
+【糖度与配方】
+- 咖啡/茶/气泡饮：用户没写按「标准糖」算；「少少甜/微糖/半糖/七分糖」按标准糖的 50% 折算糖浆热量；「无糖/不加糖/不另外加糖」按 0 算糖
+- 连锁品牌（瑞幸/星巴克/蜜雪/霸王茶姬/柠C/喜茶/奈雪/古茗）：以该品牌公开的官方营养信息为准，没有就按通用同类配方估并在 note 里说明
+- 「美式」默认无糖无奶，≈ 5-10kcal/份；「加糖美式/风味美式」按糖浆热量加上去
+
+【参考值自检（输出前必须对照）】
+- 鸡蛋 ≈ 72-78kcal/个 | 鸡胸肉 ≈ 165kcal/100g | 牛油果 ≈ 160kcal/100g
+- 可乐 ≈ 42kcal/100ml | 美式无糖 ≈ 2-5kcal/100ml | 拿铁 ≈ 50-60kcal/100ml
+- 瑞幸大杯标准糖柠C气泡美式 ≈ 120-130kcal | 蜜雪冰城大杯奶茶标准糖 ≈ 300-400kcal
+- 偏差超过 50% 请重算
+
+【输出】严格 JSON 一段，不要其他文字：
+{"cal":整数,"carb":整数克,"unit":"份/个/碗/杯","food":"规范中文名（去口语/品牌修饰）","note":"≤20字中文，说明份量/糖度/数据来源（例：「中杯500ml标准糖，按品牌官方」或「100g 生重，按成分表」）"}`;
     const body={model:cfg.model||'deepseek-chat',messages:[{role:'system',content:sys},{role:'user',content:raw}],temperature:0.2,response_format:{type:'json_object'}};
     const resp=await fetch(cfg.base.replace(/\/+$/,'')+'/chat/completions',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+cfg.key},body:JSON.stringify(body)});
     if(!resp.ok){const t=await resp.text().catch(()=>'');throw new Error('HTTP '+resp.status+(t?(' '+t.slice(0,80)):''));}

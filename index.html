@@ -1018,7 +1018,7 @@ body.app-hidden *{animation-play-state:paused!important}
   <div class="diet-carb-now" id="dietCarbNow"></div>
 
   <div class="custom-food" id="customFood">
-    <div class="cf-head"><span>🍞 我的食物库</span><span class="cf-add" id="cfAddBtn">+ 添加自定义食物</span></div>
+    <div class="cf-head"><span>🍞 最近食物</span><span class="cf-add" id="cfAddBtn">+ 自定义食物</span></div>
     <div class="cf-form" id="cfForm">
       <input type="text" id="cfName" placeholder="食物名称，如：自制鸡胸沙拉">
       <div class="cf-row">
@@ -1076,7 +1076,6 @@ body.app-hidden *{animation-play-state:paused!important}
     <textarea id="dietNote" placeholder="记录今日饮食感受…"></textarea>
   </div>
   <datalist id="foodList"></datalist>
-  <div class="food-quick" id="foodQuick"></div>
 </main>
 
 <!-- 概览页 -->
@@ -1705,7 +1704,7 @@ const MENUS = {
 const KEY='fitness_workbench_v2';
 let state=load();
 // 强制缓存更新：版本变化时清除所有 sw 缓存并硬刷新
-const APP_VER='50';
+const APP_VER='51';
 if(localStorage.getItem('app_ver')!==APP_VER){
   localStorage.setItem('app_ver',APP_VER);
   if('caches' in window)caches.keys().then(n=>{n.forEach(c=>{if(c.includes('fitness-workbench'))caches.delete(c);});}).then(()=>location.reload(true));
@@ -3048,7 +3047,7 @@ function switchPage(p){
     b.classList.remove('active','pA','pB');
     if(b.dataset.page===p){b.classList.add('active');b.classList.add(curProfile==='A'?'pA':'pB')}
   });
-  if(p==='diet'){renderDiet();renderCustomFood();}
+  if(p==='diet'){renderDiet();renderRecentFood();}
   if(p==='train'){renderExLib();}
   if(p==='body'){renderBody();renderMeta();}
   if(p==='stats')renderStats();
@@ -3399,7 +3398,7 @@ function renderDiet(){
   const hist=document.getElementById('dietHistory');
   const recent=Object.keys(profile().diet).sort().reverse().slice(0,7);
   hist.innerHTML=recent.length?('<div class="dh-title">近期记录</div><div class="dh-list">'+recent.map(d=>{const t=profile().diet[d];const cls=t==='low'?'low':(t==='high'?'high':'none');const label=t==='low'?'低碳':(t==='high'?'高碳':'—');return `<span class="dh-item ${cls}">${d.slice(5)} ${label}</span>`;}).join('')+'</div>'):'';
-  renderBreakfast();renderLunch();renderDinner();renderDietSummary();renderFoodQuick();
+  renderBreakfast();renderLunch();renderDinner();renderDietSummary();renderRecentFood();
   const fl=document.getElementById('foodList');
   if(fl){
     const foods=profile().foods||[];
@@ -3648,22 +3647,65 @@ function showWaterCheer(n){
 }
 
 /* 自定义食物 */
-function renderCustomFood(){
+// 最近食物删除：删掉该食物「最近一条」历史记录（带确认，避免误删）
+function deleteRecentFood(name){
+  let best=null;
+  ['breakfast','lunch','dinner','eatOut'].forEach(function(kind){
+    if(best)return;
+    const f=profile()[kind]; if(!f)return;
+    Object.keys(f).sort().reverse().forEach(function(d){
+      if(best)return;
+      const arr=f[d]||[];
+      for(let i=arr.length-1;i>=0;i--){
+        const it=arr[i];
+        const nm=(typeof it==='object'?it.name:((DINNER_MENU[it]&&DINNER_MENU[it].n)||''));
+        if(nm===name){best={kind:kind,d:d,i:i};break;}
+      }
+    });
+  });
+  if(best){
+    const f=profile()[best.kind];
+    f[best.d].splice(best.i,1);
+    if(!f[best.d].length)delete f[best.d];
+    save();
+  }
+  renderRecentFood();renderDiet();
+}
+// 饮食页「最近食物」卡：从 早/午/晚/外食 历史派生，点击快速填入对应餐输入框，✕ 删除最近记录
+let _lastMealInput='breakfastInput';
+function renderRecentFood(){
   const list=document.getElementById('cfList');if(!list)return;
-  const foods=profile().foods||[];
+  var recent=[],seen={};
+  ['breakfast','lunch','dinner','eatOut'].forEach(function(kind){
+    var f=profile()[kind]; if(!f)return;
+    Object.keys(f).sort().reverse().forEach(function(d){
+      (f[d]||[]).forEach(function(it){
+        var nm=(typeof it==='object'?it.name:((DINNER_MENU[it]&&DINNER_MENU[it].n)||''));
+        if(nm&&!seen[nm]){seen[nm]=1;recent.push(nm);}
+      });
+    });
+  });
   list.innerHTML='';
-  if(!foods.length){list.innerHTML='<div style="font-size:11px;color:var(--muted)">暂无自定义食物，添加后参与热量匹配</div>';return;}
-  const TH=8;
-  foods.forEach((f,i)=>{
+  if(!recent.length){list.innerHTML='<div style="font-size:11px;color:var(--muted)">仲未记录过食物，食咗嘅嘢会出喺呢度 💡</div>';return;}
+  const TH=6;
+  recent.forEach(function(nm,i){
     const div=document.createElement('div');div.className='cf-item'+(i>=TH?' cf-hidden':'');
-    div.innerHTML=`<span>${f.n} · ${f.cal}kcal/${f.u}</span><span class="cf-del" data-i="${i}">✕</span>`;
-    div.querySelector('.cf-del').onclick=()=>{const a=profile().foods||[];a.splice(i,1);profile().foods=a;save();renderCustomFood();if(curPage==='diet')renderDiet();};
+    div.innerHTML='<span class="cf-name">'+nm+'</span><span class="cf-del" title="删除记录">✕</span>';
+    div.onclick=function(){
+      var inp=document.getElementById(_lastMealInput)||document.getElementById('breakfastInput');
+      if(inp){inp.value=nm;inp.focus();showFoodHint('已填入「'+nm+'」，可修改份量后撳「添加」');}
+    };
+    div.querySelector('.cf-del').onclick=function(e){
+      e.stopPropagation();
+      if(!confirm('删除「'+nm+'」最近食物记录？'))return;
+      deleteRecentFood(nm);
+    };
     list.appendChild(div);
   });
-  if(foods.length>TH){
+  if(recent.length>TH){
     const t=document.createElement('div');t.className='lib-toggle';
-    t.textContent='展开全部 '+foods.length+' 种食物 ▾';
-    t.onclick=()=>{const c=list.classList.toggle('expanded');t.textContent=c?'收起 ▴':'展开全部 '+foods.length+' 种食物 ▾';};
+    t.textContent='展开全部 '+recent.length+' 种食物 ▾';
+    t.onclick=function(){const c=list.classList.toggle('expanded');t.textContent=c?'收起 ▴':'展开全部 '+recent.length+' 种食物 ▾';};
     list.appendChild(t);
   }
 }
@@ -4499,7 +4541,7 @@ async function aiLookupFood(raw,kind,inputId){
     // 存自定义食物库（便于以后自动补全）
     if(!profile().foods)profile().foods=[];
     if(!profile().foods.some(f=>f.n===food))profile().foods.push({n:food,cal,carb,u:unit});
-    save();renderCustomFood();if(curPage==='diet')renderDiet();
+    save();renderRecentFood();if(curPage==='diet')renderDiet();
     // 登记到当前餐
     if(!profile()[kind])profile()[kind]={};
     if(!profile()[kind][recKey()])profile()[kind][recKey()]=[];
@@ -4671,7 +4713,7 @@ function renderExLib(){
   const lib=profile().exLib||[];
   if(!lib.length){el.innerHTML='<div class="el-empty">仲未记录过动作。喺上面打「动作＋组数次数重量」记录一次就会出现喺呢度 💡</div>';return;}
   el.innerHTML='';
-  const TH=8;
+  const TH=6;
   lib.forEach((e,idx)=>{
     const item=document.createElement('div');item.className='el-item'+(idx>=TH?' el-hidden':'');
     item.innerHTML='<span>'+e.name+'</span><span class="el-chart" title="进步曲线">📊</span><span class="el-add" title="记录今日">＋</span><span class="el-del" title="删除动作">🗑</span>';
@@ -4800,34 +4842,11 @@ document.getElementById('exAi').onclick=()=>{
     };
   });
 })();
-/* 饮食：最近食物做成点击小标签（替代原生 datalist，避免手机浏览器自动替换/截断输入） */
-let _lastMealInput='breakfastInput';
+/* 饮食：记录最近聚焦嘅餐输入框，最近食物卡「点一下」填到对应餐 */
 ['breakfastInput','lunchInput','dinnerInput'].forEach(function(id){
   var el=document.getElementById(id);
   if(el)el.addEventListener('focus',function(){_lastMealInput=id;});
 });
-function renderFoodQuick(){
-  var q=document.getElementById('foodQuick'); if(!q)return;
-  var recent=[],seen={};
-  ['breakfast','lunch','dinner','eatOut'].forEach(function(kind){
-    var f=profile()[kind]; if(!f)return;
-    Object.keys(f).sort().reverse().forEach(function(d){
-      (f[d]||[]).forEach(function(it){
-        var nm=(typeof it==='object'?it.name:((DINNER_MENU[it]&&DINNER_MENU[it].n)||''));
-        if(nm&&!seen[nm]){seen[nm]=1;recent.push(nm);}
-      });
-    });
-  });
-  if(!recent.length){q.style.display='none';return;}
-  q.style.display='';
-  q.innerHTML='<div style="font-size:12px;color:var(--muted);margin:2px 2px 6px">最近食物（点一下快速填入）</div>'+recent.slice(0,12).map(function(n){return '<button type="button" class="ex-chip">'+n+'</button>';}).join('');
-  q.querySelectorAll('.ex-chip').forEach(function(b){
-    b.onclick=function(){
-      var inp=document.getElementById(_lastMealInput)||document.getElementById('breakfastInput');
-      if(inp){inp.value=b.textContent;inp.focus();showFoodHint('已填入「'+b.textContent+'」，可修改份量后撳「添加」');}
-    };
-  });
-}
 
 /* 拍照事件 */
 document.getElementById('photoTakeBtn').onclick=()=>document.getElementById('photoInput').click();
@@ -4915,7 +4934,7 @@ document.getElementById('cfSaveBtn').onclick=()=>{
   save();
   document.getElementById('cfName').value='';document.getElementById('cfCal').value='';document.getElementById('cfCarb').value='';
   document.getElementById('cfForm').classList.remove('show');
-  renderCustomFood();if(curPage==='diet')renderDiet();
+  renderRecentFood();if(curPage==='diet')renderDiet();
   showFoodHint('✅ 已添加「'+name+'」到我的食物库');
 };
 // 身体数据

@@ -1678,7 +1678,7 @@ const MENUS = {
 const KEY='fitness_workbench_v2';
 let state=load();
 // 强制缓存更新：版本变化时清除所有 sw 缓存并硬刷新
-const APP_VER='19';
+const APP_VER='20';
 if(localStorage.getItem('app_ver')!==APP_VER){
   localStorage.setItem('app_ver',APP_VER);
   if('caches' in window)caches.keys().then(n=>{n.forEach(c=>{if(c.includes('fitness-workbench'))caches.delete(c);});}).then(()=>location.reload(true));
@@ -2780,10 +2780,8 @@ function renderCheckinBtn(){
     else if(done)btn.textContent='✓ 今日已打卡（点此取消）';
     else btn.textContent='完成今日打卡';
   } else {
-    // 过往日期：即使数据库有 rest，但冇训练记录视为数据污染，显示补登记
-    const hasRealTrain=(profile().customEx?.[recKey()]||[]).length>0||(profile().cardio?.[recKey()]||[]).length>0;
-    if(rest&&!hasRealTrain){ btn.textContent='📝 补登记打卡'; }
-    else if(rest)btn.textContent='🛌 '+lb+'休息中（点此取消）';
+    // 过往：休息→显示休息、已打卡→显示打卡、无记录→补登记
+    if(rest)btn.textContent='🛌 '+lb+'中休息（点此取消）';
     else if(done)btn.textContent='✓ '+lb+'已打卡（点此取消）';
     else btn.textContent='📝 补登记打卡';
   }

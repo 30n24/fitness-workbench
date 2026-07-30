@@ -1,7 +1,7 @@
 # 健身计划工作台（fitness-workbench）续接说明
 
 > 用途：新开任务会话时，把本文件内容贴给 AI，它即可无缝衔接，不必重新了解项目。
-> 最后更新：v35（2026-07-30）。代码托管：GitHub Pages `30n24/fitness-workbench`。
+> 最后更新：v36（2026-07-30）。代码托管：GitHub Pages `30n24/fitness-workbench`。
 
 ---
 
@@ -20,13 +20,13 @@
 
 | 文件 | 作用 |
 |------|------|
-| `index.html` | **主程序**，单文件含全部 HTML/CSS/JS，约 3400+ 行。改功能只改这里。 |
+| `index.html` | **主程序**，单文件含全部 HTML/CSS/JS，当前 **4881 行**。改功能只改这里。 |
 | `fresh.html` / `wb.html` | `index.html` 的同步副本。**每次改完 index.html 必须 `cp index.html fresh.html && cp index.html wb.html`**。 |
 | `sw.js` | Service Worker。`CACHE_NAME` 需与 `index.html` 里的 `APP_VER` 同步递增。 |
-| `manifest.webmanifest` / 图标 | PWA 安装资源，一般不动。 |
+| `manifest.json` / 图标 | PWA 安装资源，一般不动。 |
 
 **版本号铁律**：改 `index.html` 后
-1. `index.html` 内 `const APP_VER='NN';`（约 1692 行）递增；
+1. `index.html` 内 `const APP_VER='NN';`（当前 1704 行）递增；
 2. `sw.js` 内 `const CACHE_NAME='fitness-workbench-vNN';`（第 3 行）同步递增；
 3. `cp index.html fresh.html && cp index.html wb.html`；
 4. 提交并 `git push`（仓库 `30n24/fitness-workbench`，分支 `main`）。
@@ -38,7 +38,7 @@
 ## 3. 关键架构与已落地的设计
 
 ### 3.1 食物热量/碳水三级查找（matchFoodCal 等）
-1. **本地 `FOOD_DB`**（约 3095–3157 行）：每项含 `cal`（每 100g 热量）与 `carb`（每 100g 碳水）。生鲜/常见食材走这里。
+1. **本地 `FOOD_DB`**（当前 `const FOOD_DB=[` 在 3110 行）：每项含 `cal`（每 100g 热量）与 `carb`（每 100g 碳水）。生鲜/常见食材走这里。
 2. **USDA 直查** `usdaLookupFood`：英文/生鲜食材名，无需 API Key。
 3. **AI 查** `aiLookupFood`：仅中式品牌/菜品需要「数据管理 → 🤖 AI 查热量」填的 AI Key。
 
@@ -95,6 +95,11 @@ NODE_PATH=/workspace/deploy/node_modules node 你的测试.js
 
 ## 6. 仍未做 / 用户曾提过但未要求实现的项
 
+- **🔴 代码审查待修项（2026-07-30 审查，详见 `/workspace/调整建议.md`）**：
+  - **同步并发丢数据**：`cloudPut` 遇 `409` 盲目用旧 `data` 覆盖；`syncPush`/`mergeDateField` 对数组字段按「日期键最后写入者胜」，双人双设备同时记某餐会静默丢条目。修法：409 重试改为「重新 `cloudGet` + 重新合并本地」；数组字段按条目 `id` 去重并集。
+  - **热量缺口符号 bug**：`renderCalorieSummary` 缺口分支显示 `-def`（应为 `+def`），缺口时括号里写成「缺口达标 -500kcal」，与粗体 `500` 矛盾。一行修复。
+  - **主训练页力量训练热量未计入每日缺口**：`exCal` 只含 cardio/badminton/customEx，`estExCal`/`estExCalFromDetail` 已就绪却没接。
+  - **每次 `save()` 直打 GitHub API 写、无防抖**：易限流、放大 409 碰撞（建议 1–2s 防抖）。
 - **「重新计算历史记录」**：用户之前提过、但未明确要，未实现。
 - **把「数据管理」按钮移到主页**：用户提过，未实现。
 - **可选性能项**（v34 诊断时发现，未改以免过度）：

@@ -839,7 +839,7 @@ html.dark .dash-card{background:#171f30}
     <div class="ai-sec" style="margin-top:12px">② USDA 营养库 Key（可选 · 提升准确度）</div>
     <label>USDA Key</label>
     <input type="password" id="aiUsda" placeholder="留空即用免费 DEMO_KEY（有频次上限）" autocomplete="off">
-    <div class="ai-tip" style="margin-top:6px">不填也能查（默认用 USDA 免费 DEMO_KEY）。想去掉频次限制：到 <a href="https://fdc.nal.usda.gov/api-key-signup.html" target="_blank" rel="noopener" style="color:var(--accent);text-decoration:underline">fdc.nal.usda.gov 免费申请</a> 一个 Key 贴这里即可（邮箱注册，秒发）。</div>
+    <div class="ai-tip" style="margin-top:6px">不填也能查（默认用 USDA 免费 DEMO_KEY）。想去掉频次限制：到 <a href="https://fdc.nal.usda.gov/api-key-signup.html" target="_blank" rel="noopener" style="color:var(--accent);text-decoration:underline">fdc.nal.usda.gov 免费申请</a> 一个 Key 贴这里即可（邮箱注册，秒发）。<br><span style="color:var(--muted)">🔒 Key 仅存本机浏览器 localStorage，<b>不会上传云端同步、不会写入任何公开文件</b>，可放心填。</span></div>
       <div class="ai-actions">
         <button class="ai-save" id="aiSave">保存</button>
         <button class="ai-test" id="aiTest">测试</button>
@@ -1687,7 +1687,7 @@ const MENUS = {
 const KEY='fitness_workbench_v2';
 let state=load();
 // 强制缓存更新：版本变化时清除所有 sw 缓存并硬刷新
-const APP_VER='25';
+const APP_VER='26';
 if(localStorage.getItem('app_ver')!==APP_VER){
   localStorage.setItem('app_ver',APP_VER);
   if('caches' in window)caches.keys().then(n=>{n.forEach(c=>{if(c.includes('fitness-workbench'))caches.delete(c);});}).then(()=>location.reload(true));

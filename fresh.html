@@ -1687,7 +1687,7 @@ const MENUS = {
 const KEY='fitness_workbench_v2';
 let state=load();
 // 强制缓存更新：版本变化时清除所有 sw 缓存并硬刷新
-const APP_VER='28';
+const APP_VER='29';
 if(localStorage.getItem('app_ver')!==APP_VER){
   localStorage.setItem('app_ver',APP_VER);
   if('caches' in window)caches.keys().then(n=>{n.forEach(c=>{if(c.includes('fitness-workbench'))caches.delete(c);});}).then(()=>location.reload(true));
@@ -4115,6 +4115,9 @@ const FLAVORED_DRINKS=[
   {n:'西柚美式',cal0:52,carb0:12,cal1:110,carb1:25},
   {n:'蓝莓美式',cal0:58,carb0:14,cal1:118,carb1:27},
   {n:'芒果美式',cal0:60,carb0:15,cal1:120,carb1:28},
+  {n:'柚见美式',cal0:55,carb0:13,cal1:115,carb1:26},
+  {n:'薄荷美式',cal0:50,carb0:12,cal1:100,carb1:22},
+  {n:'椰青美式',cal0:55,carb0:13,cal1:115,carb1:26},
   /* 风味拿铁（含奶基底） */
   {n:'生椰拿铁',cal0:110,carb0:9,cal1:140,carb1:13},
   {n:'丝绒拿铁',cal0:120,carb0:10,cal1:175,carb1:21},
@@ -4125,6 +4128,10 @@ const FLAVORED_DRINKS=[
   {n:'榛果拿铁',cal0:125,carb0:11,cal1:190,carb1:25},
   {n:'燕麦拿铁',cal0:120,carb0:10,cal1:180,carb1:22},
   {n:'椰云拿铁',cal0:120,carb0:10,cal1:175,carb1:21},
+  {n:'菠萝拿铁',cal0:120,carb0:10,cal1:180,carb1:22},
+  {n:'菠萝风味拿铁',cal0:120,carb0:10,cal1:180,carb1:22},
+  {n:'西瓜椰椰拿铁',cal0:120,carb0:12,cal1:185,carb1:25},
+  {n:'厚乳拿铁',cal0:140,carb0:12,cal1:200,carb1:24},
   /* 果茶/奶茶（无咖啡） */
   {n:'满杯红柚',cal0:50,carb0:12,cal1:180,carb1:42},
   {n:'多肉葡萄',cal0:55,carb0:13,cal1:190,carb1:45},
@@ -4132,7 +4139,10 @@ const FLAVORED_DRINKS=[
   {n:'茉莉奶绿',cal0:120,carb0:11,cal1:200,carb1:30},
   {n:'芝芝芒芒',cal0:130,carb0:20,cal1:240,carb1:42},
   {n:'珍珠奶茶',cal0:200,carb0:30,cal1:350,carb1:55},
-  {n:'烧仙草',cal0:150,carb0:20,cal1:280,carb1:45}
+  {n:'烧仙草',cal0:150,carb0:20,cal1:280,carb1:45},
+  /* 椰系（非咖啡） */
+  {n:'椰青冰翠',cal0:70,carb0:10,cal1:130,carb1:24},
+  {n:'椰青',cal0:70,carb0:10,cal1:130,carb1:24}
 ];
 const SUGAR_BRANDS=['瑞幸','库迪','星巴克','幸运咖','蜜雪冰城','蜜雪','喜茶','奈雪','霸王茶姬','柠C','古茗','沪上阿姨','茶百道','CoCo','茶颜悦色','书亦','益禾堂','甜啦啦'];
 function resolveSugarDrink(raw){
@@ -4168,6 +4178,20 @@ function resolveSugarDrink(raw){
       const name=(brand?brand:'')+d.n+dg+sizeNote;
       return {name,cal,carb,degree,qty,sizeNote};
     }
+  }
+  // 6) 通用兜底：任意「风味美式/风味拿铁/果茶」按品类锚点估算（覆盖瑞幸/库迪等未收录的海量 SKU）
+  //    风味词命中才用，纯美式/纯拿铁/纯茶仍交本地库或 AI，避免误判
+  const FLAVOR_RE=/百香果|柠|橘|橙|柚|葡萄|芒果|西柚|凤梨|菠萝|蓝莓|草莓|桃|荔枝|椰|西瓜|莓|茶|抹茶|薄荷|芦荟|苦瓜|奇异果|猕猴桃|苹果|梨|火龙果|桑葚|青提|车厘子|厚乳|黑糖|焦糖|柚见|茉莉|蜜桃|石榴|红柚/;
+  const FRUIT_RE=/百香果|柠|橘|橙|柚|葡萄|芒果|西柚|凤梨|菠萝|蓝莓|草莓|桃|荔枝|椰|西瓜|莓|芦荟|苦瓜|奇异果|猕猴桃|苹果|梨|火龙果|桑葚|青提|车厘子|蜜桃|石榴|红柚/;
+  let gd=null;
+  if(raw.includes('美式')&&FLAVOR_RE.test(raw)) gd={cal0:55,carb0:13,cal1:115,carb1:26};
+  else if(raw.includes('拿铁')) gd={cal0:120,carb0:10,cal1:180,carb1:22};
+  else if(raw.includes('茶')&&(FRUIT_RE.test(raw)||raw.includes('奶茶')||raw.includes('果茶')||raw.includes('水果茶'))) gd={cal0:50,carb0:12,cal1:180,carb1:42};
+  if(gd){
+    const cal=Math.round((gd.cal0+(gd.cal1-gd.cal0)*f)*size)*qty;
+    const carb=Math.round((gd.carb0+(gd.carb1-gd.carb0)*f)*size)*qty;
+    let name=raw; if(qm&&qm[0]) name=raw.slice(qm[0].length).trim();
+    return {name,cal,carb,degree,qty,sizeNote,generic:true};
   }
   return null;
 }
@@ -4288,7 +4312,7 @@ async function aiLookupFood(raw,kind,inputId){
   const fd=resolveSugarDrink(raw);
   if(fd){
     const r=registerMeal(kind,fd.name,fd.cal,fd.carb,inputId);
-    showFoodHint('🏷️ 品牌风味饮（糖度匹配）：'+r.name+' ≈ '+r.cal+'kcal / '+r.carb+'g碳（'+fd.degree+(fd.qty>1?(' ×'+fd.qty):'')+(fd.sizeNote?(' '+fd.sizeNote):'')+'）');
+    showFoodHint('🏷️ 品牌风味饮（糖度匹配）：'+r.name+' ≈ '+r.cal+'kcal / '+r.carb+'g碳（'+fd.degree+(fd.qty>1?(' ×'+fd.qty):'')+(fd.sizeNote?(' '+fd.sizeNote):'')+(fd.generic?'·通用估算':'')+'）');
     return;
   }
   // 2) USDA 权威营养库（免费·跨域·无需 AI Key，覆盖生鲜/原料级准确度，对标市面 app）

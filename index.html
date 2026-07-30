@@ -1678,7 +1678,7 @@ const MENUS = {
 const KEY='fitness_workbench_v2';
 let state=load();
 // 强制缓存更新：版本变化时清除所有 sw 缓存并硬刷新
-const APP_VER='18';
+const APP_VER='19';
 if(localStorage.getItem('app_ver')!==APP_VER){
   localStorage.setItem('app_ver',APP_VER);
   if('caches' in window)caches.keys().then(n=>{n.forEach(c=>{if(c.includes('fitness-workbench'))caches.delete(c);});}).then(()=>location.reload(true));
@@ -1888,10 +1888,11 @@ function cleanupStaleCheckins(){
       if(hasEx||hasCardio||Object.keys(c.exercises||{}).length>0){
         // 有训练记录：强制确保不是休息
         if(c.rest){ c.rest=false; c.partChecked=true; }
-      } else {
-        // 冇任何训练记录：删除整个 checkin（不管打卡还是休息）
+      } else if(!c.rest){
+        // 冇训练记录、也唔系休息日：删除虚假打卡
         delete cks[k];
       }
+      // 若 c.rest==true 但冇训练 → 合法休息日，保留
     });
   });
   saveLocal();

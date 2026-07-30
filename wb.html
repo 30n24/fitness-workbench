@@ -257,6 +257,11 @@ main{padding:14px 14px 20px;max-width:680px;margin:0 auto}
 .diet-history .dh-item.low{border-color:rgba(52,211,153,.3);color:var(--green)}
 .diet-history .dh-item.high{border-color:rgba(251,146,60,.3);color:var(--orange)}
 .diet-history .dh-item.none{color:var(--muted)}
+.diet-carb-now{margin:0 2px 12px;padding:12px 14px;border-radius:14px;background:linear-gradient(135deg,rgba(16,185,129,.12),var(--card));border:1px solid rgba(16,185,129,.35);font-size:15px;font-weight:600;display:flex;align-items:center;gap:8px}
+.diet-carb-now b{font-size:22px;color:var(--green);font-weight:800}
+.diet-carb-now .dc-tag{margin-left:auto;font-size:12px;font-weight:700;padding:3px 10px;border-radius:999px}
+.diet-carb-now .dc-tag.low{background:rgba(16,185,129,.16);color:var(--green)}
+.diet-carb-now .dc-tag.high{background:rgba(249,115,22,.16);color:var(--orange)}
 /* 自主输入饮食 */
 .meal-input-card{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:12px 14px;margin:0 2px 12px}
 .meal-row{display:flex;gap:8px;margin-bottom:8px}
@@ -1001,6 +1006,7 @@ html.dark .dash-card{background:#171f30}
     </label>
   </div>
   <div class="diet-history" id="dietHistory"></div>
+  <div class="diet-carb-now" id="dietCarbNow"></div>
 
   <div class="custom-food" id="customFood">
     <div class="cf-head"><span>🍞 我的食物库</span><span class="cf-add" id="cfAddBtn">+ 添加自定义食物</span></div>
@@ -1689,7 +1695,7 @@ const MENUS = {
 const KEY='fitness_workbench_v2';
 let state=load();
 // 强制缓存更新：版本变化时清除所有 sw 缓存并硬刷新
-const APP_VER='34';
+const APP_VER='35';
 if(localStorage.getItem('app_ver')!==APP_VER){
   localStorage.setItem('app_ver',APP_VER);
   if('caches' in window)caches.keys().then(n=>{n.forEach(c=>{if(c.includes('fitness-workbench'))caches.delete(c);});}).then(()=>location.reload(true));
@@ -3383,6 +3389,7 @@ function migrateDinner(){
 }
 function renderDietSummary(){
   const k=recKey();
+  const diet=profile().diet?.[k]||'';
   const bfI=(profile().breakfast?.[k]||[]), lnI=(profile().lunch?.[k]||[]);
   const dnI=(profile().dinner?.[k]||[]).map(x=>typeof x==='object'?x:{name:DINNER_MENU[x]?.n||'',cal:DINNER_MENU[x]?.cal||0,carb:DINNER_MENU[x]?.carb||0});
   const eoI=(profile().eatOut?.[k]||[]);
@@ -3398,6 +3405,8 @@ function renderDietSummary(){
     (eo?`<div class="ds-row"><span>🍴 外食</span><span class="ds-v">${eo}kcal · ${eoC}g碳</span></div>`:'')+
     `<div class="ds-row total"><span>今日总热量</span><span class="ds-v">${total}kcal</span></div>`+
     `<div class="ds-row total carb"><span>今日总碳水</span><span class="ds-v">${totalCarb}g</span></div>`;
+  const cNow=document.getElementById('dietCarbNow');
+  if(cNow)cNow.innerHTML=`🍚 今日碳水 <b>${totalCarb}g</b>`+(diet==='low'?' <span class="dc-tag low">低碳日</span>':diet==='high'?' <span class="dc-tag high">高碳日</span>':'');
   // 对方今晚吃了什么（兼容旧版"菜单序号"与新版"自主输入条目"）
   const pp=curProfile==='A'?'B':'A';
   const pd=(state[pp].dinner?.[k]||[]).map(x=>(typeof x==='object'?x.name:(DINNER_MENU[x]?.n||''))).filter(Boolean);

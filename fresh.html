@@ -1678,7 +1678,7 @@ const MENUS = {
 const KEY='fitness_workbench_v2';
 let state=load();
 // 强制缓存更新：版本变化时清除所有 sw 缓存并硬刷新
-const APP_VER='21';
+const APP_VER='22';
 if(localStorage.getItem('app_ver')!==APP_VER){
   localStorage.setItem('app_ver',APP_VER);
   if('caches' in window)caches.keys().then(n=>{n.forEach(c=>{if(c.includes('fitness-workbench'))caches.delete(c);});}).then(()=>location.reload(true));
@@ -3206,7 +3206,7 @@ function matchFoodCal(text){
   text=(text||'').trim();
   if(!text)return {cal:0,carb:0,matched:'',fuzzy:true,parts:[]};
   const terms=buildFoodTerms();
-  let i=0,parts=[],unmatched='',totalCal=0,totalCarb=0;
+  let i=0,parts=[],unmatched='',totalCal=0,totalCarb=0,cookedWithOil=false;
   while(i<text.length){
     const ch=text[i];
     if(/\s|[，,、;；:：.。·]/.test(ch)){i++;continue;}
@@ -3222,6 +3222,7 @@ function matchFoodCal(text){
     let best=null;
     for(const t of terms){ if(t.term.length && text.startsWith(t.term,j)){best=t;break;} }
     if(best){
+      if(/[炒煎炸爆溜]/i.test(best.term))cookedWithOil=true; // 含烹饪动词（炒蛋/煎蛋/干炒等）→ 计炒菜油
       const isW=(best.u==='100g'||best.u==='100ml');
       let amount, realQty;
       if(isW){
@@ -3241,12 +3242,14 @@ function matchFoodCal(text){
       i=j+best.term.length;
     } else {
       // 拆不出食物：跳过一个连接词再试（应对「番茄炒蛋」类搭配）
-      if(_CONN_RE.test(ch)){i++;continue;}
+      if(_CONN_RE.test(ch)){ if(/[炒煎炸爆溜]/i.test(ch))cookedWithOil=true; i++;continue; }
       unmatched+=ch;i++;
     }
   }
   const matchedNames=parts.map(p=>p.name);
   const fuzzy = parts.length===0 || unmatched.length>0;
+  // 炒菜/煎炸会额外用油：默认约 1 汤匙 ≈ 90kcal（市面 app 同款折算，避免中式炒菜严重低估）
+  if(cookedWithOil && totalCal>0 && parts.length>=2){ totalCal+=90; if(matchedNames.length)matchedNames.push('烹调用油'); }
   return {cal:totalCal,carb:totalCarb,matched:matchedNames.join('、'),fuzzy,parts};
 }
 let _hintTimer;
@@ -4042,11 +4045,39 @@ function fmtAIError(e){
   return 'AI 查询失败：'+m.slice(0,120);
 }
 async function aiLookupFood(raw,kind,inputId){
+  raw=(raw||'').trim();
+  if(!raw){showFoodHint('先输入食物名称');return;}
+  // 把一次本地匹配结果登记到当前餐（库优先 / 无 Key 兜底都用它）
+  const applyLocal=(m)=>{
+    const name=m.matched||raw, cal=m.cal, carb=m.carb;
+    if(!profile()[kind])profile()[kind]={};
+    if(!profile()[kind][recKey()])profile()[kind][recKey()]=[];
+    profile()[kind][recKey()].push({name,cal,carb,matched:name});
+    save();
+    const inp=document.getElementById(inputId);if(inp)inp.value='';
+    if(kind==='breakfast')renderBreakfast();else if(kind==='lunch')renderLunch();else renderDinner();
+    renderDietSummary();
+    return {name,cal,carb};
+  };
   const cfg=getAICfg();
-  if(!cfg||!cfg.key){showFoodHint('未配置 AI：去「数据管理 → 🤖 AI 查热量」填写 Key');openAiCfg();return;}
+  // 0) 未配 Key：先尝试本地标准库兜底（有网/无网都能用）
+  if(!cfg||!cfg.key){
+    const m=matchFoodCal(raw);
+    if(!m.fuzzy && m.parts.length){ const r=applyLocal(m); showFoodHint('📚 本地库：'+r.name+' ≈ '+r.cal+'kcal / '+r.carb+'g碳（未配AI Key）'); }
+    else { showFoodHint('未配置 AI：去「数据管理 → 🤖 AI 查热量」填写 Key'); openAiCfg(); }
+    return;
+  }
+  // 1) 库优先（参照薄荷/MyFitnessPal：标准库命中即秒回，不浪费 AI）
+  const local=matchFoodCal(raw);
+  if(!local.fuzzy && local.parts.length){
+    const r=applyLocal(local);
+    showFoodHint('📚 本地库（优先）：'+r.name+' ≈ '+r.cal+'kcal / '+r.carb+'g碳');
+    return;
+  }
+  // 2) 库里查不到 → 才调 AI
   showFoodHint('🔍 正在用 AI 查询「'+raw+'」热量…');
   try{
-    const sys=`你是专业营养师，依据《中国食物成分表》第6版及主流连锁品牌的官方营养数据估算。用户给你一个食物描述（可能含份量/做法/口语/品牌/糖度）。
+    const sys=`你是专业营养师，依据《中国食物成分表》第6版及主流连锁品牌的官方营养数据估算。用户给你一个食物描述（可能含份量/做法/口语/品牌/糖度。
 
 【份量默认（用户没明说时按此估）】
 - 鸡蛋：1 个 ≈ 50g（去壳约 45g），≈ 72kcal
@@ -4063,9 +4094,11 @@ async function aiLookupFood(raw,kind,inputId){
 - 咖啡/茶/气泡饮：用户没写按「标准糖」算；「少少甜/微糖/半糖/七分糖」按标准糖的 50% 折算糖浆热量；「无糖/不加糖/不另外加糖」按 0 算糖
 - 连锁品牌（瑞幸/星巴克/蜜雪/霸王茶姬/柠C/喜茶/奈雪/古茗）：以该品牌公开的官方营养信息为准，没有就按通用同类配方估并在 note 里说明
 - 「美式」默认无糖无奶，≈ 5-10kcal/份；「加糖美式/风味美式」按糖浆热量加上去
+- 中式炒菜/煎炸：默认含约 1 汤匙炒菜油 ≈ 90kcal；油炸另计；蒸/煮/凉拌/烤（无额外刷油）不计油
 
 【参考值自检（输出前必须对照）】
 - 鸡蛋 ≈ 72-78kcal/个 | 鸡胸肉 ≈ 165kcal/100g | 牛油果 ≈ 160kcal/100g
+- 白米饭 ≈ 116kcal/100g | 玉米 ≈ 86-112kcal/100g | 香蕉 ≈ 89kcal/根
 - 可乐 ≈ 42kcal/100ml | 美式无糖 ≈ 2-5kcal/100ml | 拿铁 ≈ 50-60kcal/100ml
 - 瑞幸大杯标准糖柠C气泡美式 ≈ 120-130kcal | 蜜雪冰城大杯奶茶标准糖 ≈ 300-400kcal
 - 偏差超过 50% 请重算
@@ -4080,11 +4113,23 @@ async function aiLookupFood(raw,kind,inputId){
     const mm=content.match(/\{[\s\S]*\}/);
     const o=mm?JSON.parse(mm[0]):null;
     if(!o||typeof o.cal!=='number')throw new Error('AI 返回格式异常');
-    const cal=Math.round(o.cal),carb=Math.round(o.carb||0),unit=o.unit||'份';
-    const food=(o.food&&(''+o.food).trim())||raw.trim();
+    let cal=Math.round(o.cal),carb=Math.round(o.carb||0),unit=o.unit||'份';
+    let food=(o.food&&(''+o.food).trim())||raw.trim();
+    let note=(o.note&&(''+o.note).trim())||'';
+    // 3) 返回自检：与本地库同名食物偏差>40% 则改用本地库（防 AI 幻觉）
+    const check=matchFoodCal(food);
+    if(!check.fuzzy && check.parts.length && check.cal>0){
+      const refCal=check.cal,refCarb=check.carb;
+      if(Math.abs(cal-refCal)/refCal>0.4){ cal=refCal; carb=refCarb; note=(note?note+'；':'')+'已按本地库校正'; }
+    }
+    // 4) 合理边界：负热量归零；单份>1500kcal 提示核对
+    if(cal<0)cal=0;
+    if(cal>1500)note=(note?note+'；':'')+'⚠️单份偏高请核对份量';
+    // 存自定义食物库（便于以后自动补全）
     if(!profile().foods)profile().foods=[];
     if(!profile().foods.some(f=>f.n===food))profile().foods.push({n:food,cal,carb,u:unit});
     save();renderCustomFood();if(curPage==='diet')renderDiet();
+    // 登记到当前餐
     if(!profile()[kind])profile()[kind]={};
     if(!profile()[kind][recKey()])profile()[kind][recKey()]=[];
     profile()[kind][recKey()].push({name:food,cal,carb,matched:food});
@@ -4092,9 +4137,12 @@ async function aiLookupFood(raw,kind,inputId){
     const inp=document.getElementById(inputId);if(inp)inp.value='';
     if(kind==='breakfast')renderBreakfast();else if(kind==='lunch')renderLunch();else renderDinner();
     renderDietSummary();
-    showFoodHint('✅ AI：'+food+' ≈ '+cal+'kcal / '+carb+'g碳（已存为自定义食物）');
+    showFoodHint('✅ '+(note?('（'+note+'）'):'')+food+' ≈ '+cal+'kcal / '+carb+'g碳');
   }catch(e){
-    showFoodHint('⚠️ '+fmtAIError(e));
+    // AI 失败兜底：再试一次本地库（若恰能匹配）
+    const m=matchFoodCal(raw);
+    if(!m.fuzzy && m.parts.length){ const r=applyLocal(m); showFoodHint('⚠️ AI 失败，已用本地库：'+r.name+' ≈ '+r.cal+'kcal'); }
+    else showFoodHint('⚠️ '+fmtAIError(e));
   }
 }
 

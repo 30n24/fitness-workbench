@@ -1037,7 +1037,7 @@ body.app-hidden *{animation-play-state:paused!important}
   <div class="section-title">🍳 早餐（自主输入）</div>
   <div class="meal-input-card">
     <div class="meal-row">
-      <input type="text" id="breakfastInput" placeholder="食物+份量，如：2个鸡蛋 / 250ml全脂牛奶 / 瑞幸生椰拿铁" list="foodList">
+      <input type="text" id="breakfastInput" placeholder="食物+份量，如：2个鸡蛋 / 250ml全脂牛奶 / 瑞幸生椰拿铁" autocomplete="off">
       <button class="meal-add-btn" id="breakfastAdd">添加</button>
       <button class="meal-ai-btn" id="breakfastAi">🔍AI</button>
     </div>
@@ -1048,7 +1048,7 @@ body.app-hidden *{animation-play-state:paused!important}
   <div class="section-title">🍱 午餐（自主输入）</div>
   <div class="meal-input-card">
     <div class="meal-row">
-      <input type="text" id="lunchInput" placeholder="食物+份量，如：150g鸡胸肉 / 1碗糙米饭 / 瑞幸拿铁" list="foodList">
+      <input type="text" id="lunchInput" placeholder="食物+份量，如：150g鸡胸肉 / 1碗糙米饭 / 瑞幸拿铁" autocomplete="off">
       <button class="meal-add-btn" id="lunchAdd">添加</button>
       <button class="meal-ai-btn" id="lunchAi">🔍AI</button>
     </div>
@@ -1059,7 +1059,7 @@ body.app-hidden *{animation-play-state:paused!important}
   <div class="section-title">🍽️ 晚餐（自主输入）</div>
   <div class="meal-input-card">
     <div class="meal-row">
-      <input type="text" id="dinnerInput" placeholder="食物+份量，如：番茄豆腐鸡蛋 / 150g鸡胸肉 / 丝瓜炒肉" list="foodList">
+      <input type="text" id="dinnerInput" placeholder="食物+份量，如：番茄豆腐鸡蛋 / 150g鸡胸肉 / 丝瓜炒肉" autocomplete="off">
       <button class="meal-add-btn" id="dinnerAdd">添加</button>
       <button class="meal-ai-btn" id="dinnerAi">🔍AI</button>
     </div>
@@ -1076,6 +1076,7 @@ body.app-hidden *{animation-play-state:paused!important}
     <textarea id="dietNote" placeholder="记录今日饮食感受…"></textarea>
   </div>
   <datalist id="foodList"></datalist>
+  <div class="food-quick" id="foodQuick"></div>
 </main>
 
 <!-- 概览页 -->
@@ -1704,7 +1705,7 @@ const MENUS = {
 const KEY='fitness_workbench_v2';
 let state=load();
 // 强制缓存更新：版本变化时清除所有 sw 缓存并硬刷新
-const APP_VER='45';
+const APP_VER='46';
 if(localStorage.getItem('app_ver')!==APP_VER){
   localStorage.setItem('app_ver',APP_VER);
   if('caches' in window)caches.keys().then(n=>{n.forEach(c=>{if(c.includes('fitness-workbench'))caches.delete(c);});}).then(()=>location.reload(true));
@@ -1779,7 +1780,7 @@ const CLOUD={
   token:String.fromCharCode(103,104,112,95,69,68,79,48,53,105,71,67,105,72,82,78,103,77,54,74,53,119,81,109,113,101,115,83,50,113,103,116,118,56,48,51,82,86,83,80),
   get url(){return `https://api.github.com/repos/${this.owner}/${this.repo}/contents/${this.path}`}
 };
-let _syncing=false,_dirty=false,_inApp=false;
+let _syncing=false,_dirty=false,_dirtyPush=null,_inApp=false;
 function b64e(s){return btoa(unescape(encodeURIComponent(s)))}
 function b64d(s){return decodeURIComponent(escape(atob(s.replace(/\s/g,''))))}
 function cloudReady(){return CLOUD.token && CLOUD.token.indexOf('__')!==0}
@@ -1797,11 +1798,14 @@ async function cloudPut(data,sha){
     if(s)body.sha=s;
     return fetch(CLOUD.url,{method:'PUT',headers:{'Authorization':'token '+CLOUD.token,'Content-Type':'application/json','Accept':'application/vnd.github.v3+json'},body:JSON.stringify(body)});
   };
-  let r=await doPut(sha);
-  if(r.status===409){ // sha 过期（对方刚同步/并发写入），取最新 sha 重试一次
-    try{const {sha:ns}=await cloudGet(); r=await doPut(ns);}catch(e){}
+  let r,cur=sha;
+  for(let i=0;i<3;i++){           // 乐观锁：并发写入触发 409 时，取最新 sha 重试（最多 3 次）
+    r=await doPut(cur);
+    if(r.ok)break;
+    if(r.status===409){ try{const {sha:ns}=await cloudGet(); cur=ns;}catch(e){} }
+    else throw new Error('PUT '+r.status);
   }
-  if(!r.ok)throw new Error('PUT '+r.status);
+  if(!r||!r.ok)throw new Error('PUT '+(r?r.status:'?'));
   const j=await r.json();
   return j.content.sha;
 }
@@ -1867,7 +1871,7 @@ async function forcePull(){
 async function doSync(pushProfile, notify){
   if(!cloudReady())return;
   if(location.search.includes('nosync'))return;
-  if(_syncing){_dirty=true;return;}
+  if(_syncing){_dirty=true;if(pushProfile)_dirtyPush=pushProfile;return;}
   _syncing=true;setSyncStatus('syncing');
   try{
     if(pushProfile)await syncPush(pushProfile);
@@ -1877,7 +1881,7 @@ async function doSync(pushProfile, notify){
     if(notify && changed) showFoodHint('☁ 已同步到最新数据');
     else if(notify && !changed) showFoodHint('☁ 已同步，无新数据');
   }catch(e){console.warn('sync fail',e);setSyncStatus('err');if(notify)showFoodHint('☁ 同步失败，请检查网络');}
-  finally{_syncing=false;if(_dirty){_dirty=false;doSync(pushProfile,notify);}}
+  finally{_syncing=false;if(_dirty){_dirty=false;const dp=_dirtyPush;_dirtyPush=null;doSync(dp,notify);}}
 }
 function triggerSync(){ if(cloudReady() && !location.search.includes('nosync'))doSync(curProfile, false); }
 function isTyping(){const a=document.activeElement;return a&&(a.tagName==='INPUT'||a.tagName==='TEXTAREA')}
@@ -3355,7 +3359,7 @@ function renderDiet(){
   const hist=document.getElementById('dietHistory');
   const recent=Object.keys(profile().diet).sort().reverse().slice(0,7);
   hist.innerHTML=recent.length?('<div class="dh-title">近期记录</div><div class="dh-list">'+recent.map(d=>{const t=profile().diet[d];const cls=t==='low'?'low':(t==='high'?'high':'none');const label=t==='low'?'低碳':(t==='high'?'高碳':'—');return `<span class="dh-item ${cls}">${d.slice(5)} ${label}</span>`;}).join('')+'</div>'):'';
-  renderBreakfast();renderLunch();renderDinner();renderDietSummary();
+  renderBreakfast();renderLunch();renderDinner();renderDietSummary();renderFoodQuick();
   const fl=document.getElementById('foodList');
   if(fl){
     const foods=profile().foods||[];
@@ -3453,10 +3457,11 @@ function renderCalorieSummary(){
       calTotal.textContent=foodCal+'kcal';   // 饮食摄入（吃进来嘅）
       calBurn.textContent=exCal+'kcal';       // 运动消耗（记录值，仅参考）
       if(tdee!=null){
-        const def=tdee-foodCal;               // 真正热量缺口 = 总消耗 − 摄入
+        const burn=tdee+exCal;                 // 实际总消耗 = 估算日常消耗(含活动系数) + 记录运动(有氧/羽毛球/力量)
+        const def=burn-foodCal;                // 真正热量缺口 = 实际总消耗 − 摄入
         const cls=def>0?'cal-neg':'cal-pos';  // 缺口达标(绿) / 盈余(橙)
-        const tag=def>0?('缺口达标 '+(-def)+'kcal'):('高于消耗，盈余 '+(def*-1)+'kcal');
-        calDetail.innerHTML=`📊 每日总消耗 <b>${tdee}</b>kcal · 📉 热量缺口 <b class="${cls}">${def>0?def:(-def)}</b>kcal <span class="${cls}">（${tag}）</span>`;
+        const tag=def>0?('缺口达标 +'+def+'kcal'):('高于消耗，盈余 +'+(-def)+'kcal');
+        calDetail.innerHTML=`📊 实际总消耗 <b>${burn}</b>kcal（含记录运动 ${exCal}kcal）· 📉 热量缺口 <b class="${cls}">${Math.abs(def)}</b>kcal <span class="${cls}">（${tag}）</span>`;
       } else {
         const net=foodCal-exCal;
         calDetail.innerHTML=`运动消耗(记录) ${exCal}kcal · 净额 ${net>=0?'+':''}${net}kcal <span style="color:var(--muted)">· 去身体页填代谢参数算真正缺口</span>`;
@@ -4755,6 +4760,34 @@ document.getElementById('exAi').onclick=()=>{
     };
   });
 })();
+/* 饮食：最近食物做成点击小标签（替代原生 datalist，避免手机浏览器自动替换/截断输入） */
+let _lastMealInput='breakfastInput';
+['breakfastInput','lunchInput','dinnerInput'].forEach(function(id){
+  var el=document.getElementById(id);
+  if(el)el.addEventListener('focus',function(){_lastMealInput=id;});
+});
+function renderFoodQuick(){
+  var q=document.getElementById('foodQuick'); if(!q)return;
+  var recent=[],seen={};
+  ['breakfast','lunch','dinner','eatOut'].forEach(function(kind){
+    var f=profile()[kind]; if(!f)return;
+    Object.keys(f).sort().reverse().forEach(function(d){
+      (f[d]||[]).forEach(function(it){
+        var nm=(typeof it==='object'?it.name:((DINNER_MENU[it]&&DINNER_MENU[it].n)||''));
+        if(nm&&!seen[nm]){seen[nm]=1;recent.push(nm);}
+      });
+    });
+  });
+  if(!recent.length){q.style.display='none';return;}
+  q.style.display='';
+  q.innerHTML='<div style="font-size:12px;color:var(--muted);margin:2px 2px 6px">最近食物（点一下快速填入）</div>'+recent.slice(0,12).map(function(n){return '<button type="button" class="ex-chip">'+n+'</button>';}).join('');
+  q.querySelectorAll('.ex-chip').forEach(function(b){
+    b.onclick=function(){
+      var inp=document.getElementById(_lastMealInput)||document.getElementById('breakfastInput');
+      if(inp){inp.value=b.textContent;inp.focus();showFoodHint('已填入「'+b.textContent+'」，可修改份量后撳「添加」');}
+    };
+  });
+}
 
 /* 拍照事件 */
 document.getElementById('photoTakeBtn').onclick=()=>document.getElementById('photoInput').click();

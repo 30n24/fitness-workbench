@@ -1,7 +1,7 @@
 # 健身计划工作台（fitness-workbench）续接说明
 
 > 用途：新开任务会话时，把本文件内容贴给 AI，它即可无缝衔接，不必重新了解项目。
-> 最后更新：v45（2026-07-30）。代码托管：GitHub Pages `30n24/fitness-workbench`。
+> 最后更新：v46（2026-07-30）。代码托管：GitHub Pages `30n24/fitness-workbench`。
 
 ---
 
@@ -85,6 +85,7 @@
 | v43 | 修复选人页自定义称呼：之前只在点卡片进 App 时才落盘，填了没进/没上传一更新重进就丢；改为 `oninput` 即时写 `state.x.name` 并 `saveLocal()`，重载/版本更新都能还原；上传交 30s 定时同步（不每键推云端） |
 | v44 | 新增「我的动作库」删除功能：每个动作项加红色 🗑 按钮，点按 `confirm` 后从 `exLib` 移除并重渲染（只删动作库，不影响已记录的训练）；配 `.el-del` 样式 |
 | v45 | 修复冷启动（退出后台杀进程再重开）今日已训练记录不显示：根因 `enterApp()` 调 `renderAll()` 但旧 `renderAll()` 漏了 `renderCustomEx()`/`renderExParts()`（这两只在日期翻页的 `applyRecDate()` 里），导致冷启动没画今日训练列表与 5 部位视图，翻日才触发显示。现把 `renderCustomEx();renderExParts();` 补进 `renderAll()`，冷启动即渲染今日记录 |
+| v46 | 四个优化：(1) 饮食输入框去原生 datalist 截断（移除 `list="foodList"`+`autocomplete="off"`，改用「最近食物」点击小标签 `#foodQuick`，跟 v41 同思路）；(2) 修热量缺口符号 bug（缺口达标时 tag 误显 `-500kcal`，改为 `+' +500kcal`）；(3) 热量缺口并入实际运动消耗 `burn=tdee+exCal`，力量/有氧/羽毛球均计入缺口；(4) 云同步加固：`doSync` 加 `_dirtyPush` 避免「仅拉取」外层吞掉待推送写入，乐观锁 409 重试由 1 次升为最多 3 次取最新 sha |
 
 ---
 

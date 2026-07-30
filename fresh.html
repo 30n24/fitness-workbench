@@ -1705,7 +1705,7 @@ const MENUS = {
 const KEY='fitness_workbench_v2';
 let state=load();
 // 强制缓存更新：版本变化时清除所有 sw 缓存并硬刷新
-const APP_VER='49';
+const APP_VER='50';
 if(localStorage.getItem('app_ver')!==APP_VER){
   localStorage.setItem('app_ver',APP_VER);
   if('caches' in window)caches.keys().then(n=>{n.forEach(c=>{if(c.includes('fitness-workbench'))caches.delete(c);});}).then(()=>location.reload(true));
@@ -3311,6 +3311,8 @@ function matchFoodCal(text){
     let qty=1,explicit=false,j=i;
     const pq=parseLeadingQty(text,i);
     qty=pq.qty;explicit=pq.explicit;j=pq.end;
+    // 跳过数量与量词之间的空白/标点（"1/3 根玉米" / "1/3、根玉米" 也能正确连读）
+    while(j<text.length && /[\s、，,;；:：.。·]/.test(text[j])) j++;
     // 2) 量词
     let mw=null;
     const mm=text.slice(j).match(_MW_RE);
@@ -3334,6 +3336,7 @@ function matchFoodCal(text){
       }
       // 后置数量（食物后跟 数字/分数+量词，如「番薯半斤」「米饭一碗」「米饭1/2碗」「鸡蛋1/3」）
       let k=j+best.term.length;
+      while(k<text.length && /[\s、，,;；:：.。·]/.test(text[k])) k++;
       const tq=parseLeadingQty(text,k);
       if(tq.explicit){
         const k2=tq.end;

@@ -1,7 +1,7 @@
 # 健身计划工作台（fitness-workbench）续接说明
 
 > 用途：新开任务会话时，把本文件内容贴给 AI，它即可无缝衔接，不必重新了解项目。
-> 最后更新：v36（2026-07-30）。代码托管：GitHub Pages `30n24/fitness-workbench`。
+> 最后更新：v38（2026-07-30）。代码托管：GitHub Pages `30n24/fitness-workbench`。
 
 ---
 
@@ -76,6 +76,8 @@
 | v34 | 移除顶/底栏 `backdrop-filter:blur` 降低手机发热（毛玻璃每帧重绘是发热主因） |
 | v35 | 饮食页顶部新增醒目「今日碳水」实时读数 |
 | v36 | 动作库/食物库超长自动折叠（>8 项折叠，点「展开全部 N」展开）；顺带修复进训练页动作库空白的潜在 bug |
+| v37 | 修复概览页计划 B 部位分布缺失+英文（renderStats 的 partNames 对齐 PARTS_B，并兼容 classifyPart 写入的纯 key） |
+| v38 | 降发热：页面隐藏(`visibilitychange`)即暂停全部 `infinite` 动画（`app-hidden` 类）+ 停 30s 云同步定时器；`foodList` datalist 按「自定义食物签名」缓存，仅变化时重建。画面使用时完全不变 |
 
 ---
 
@@ -102,10 +104,7 @@ NODE_PATH=/workspace/deploy/node_modules node 你的测试.js
   - **每次 `save()` 直打 GitHub API 写、无防抖**：易限流、放大 409 碰撞（建议 1–2s 防抖）。
 - **「重新计算历史记录」**：用户之前提过、但未明确要，未实现。
 - **把「数据管理」按钮移到主页**：用户提过，未实现。
-- **可选性能项**（v34 诊断时发现，未改以免过度）：
-  - 常驻 `infinite` CSS 动画（`ciPulse`/`moonPulse`/`zzz`/`waterPulse`）持续耗电；
-  - 云同步 `setInterval` 每 30s（登录云同步后）；
-  - `renderDiet` 每次重建数百个 `<option>` 的 `foodList` datalist（可缓存）。
+- ~~**可选性能项**（v34 诊断时发现，未改以免过度）~~ → **已于 v38 实现（画面使用时效果完全不变）**：后台隐藏即暂停全部 `infinite` 动画（`ciPulse`/`moonPulse`/`zzz`/`waterPulse`）、停 30s 云同步定时器、foodList datalist 按签名缓存仅变化时重建。详见 v38 版本表。
 - **碳水目标值**：当前只显示总量与低碳/高碳标签，未设每日碳水上限/下限参考线。
 
 ---

@@ -784,6 +784,8 @@ html.dark .dash-card{background:#171f30}
 @keyframes ciPulse{0%,100%{transform:scale(1)}50%{transform:scale(1.018)}}
 .checkin-btn:not(.done){animation:ciPulse 2.2s ease-in-out infinite}
 .checkin-btn.done{font-weight:800;border-color:var(--green)!important}
+/* 后台/页面隐藏时暂停全部动画，省电降温；可见时自动恢复，画面无变化 */
+body.app-hidden *{animation-play-state:paused!important}
 </style>
 </head>
 <body>
@@ -1701,7 +1703,7 @@ const MENUS = {
 const KEY='fitness_workbench_v2';
 let state=load();
 // 强制缓存更新：版本变化时清除所有 sw 缓存并硬刷新
-const APP_VER='37';
+const APP_VER='38';
 if(localStorage.getItem('app_ver')!==APP_VER){
   localStorage.setItem('app_ver',APP_VER);
   if('caches' in window)caches.keys().then(n=>{n.forEach(c=>{if(c.includes('fitness-workbench'))caches.delete(c);});}).then(()=>location.reload(true));
@@ -3355,7 +3357,15 @@ function renderDiet(){
   hist.innerHTML=recent.length?('<div class="dh-title">近期记录</div><div class="dh-list">'+recent.map(d=>{const t=profile().diet[d];const cls=t==='low'?'low':(t==='high'?'high':'none');const label=t==='low'?'低碳':(t==='high'?'高碳':'—');return `<span class="dh-item ${cls}">${d.slice(5)} ${label}</span>`;}).join('')+'</div>'):'';
   renderBreakfast();renderLunch();renderDinner();renderDietSummary();
   const fl=document.getElementById('foodList');
-  if(fl){const names=FOOD_DB.map(f=>f.n).concat((profile().foods||[]).map(f=>f.n));fl.innerHTML=names.map(n=>`<option value="${n}">`).join('');}
+  if(fl){
+    const foods=profile().foods||[];
+    const sig=foods.length+':'+foods.map(f=>f.n).join('|');
+    if(fl._sig!==sig){
+      const names=FOOD_DB.map(f=>f.n).concat(foods.map(f=>f.n));
+      fl.innerHTML=names.map(n=>`<option value="${n}">`).join('');
+      fl._sig=sig;
+    }
+  }
 }
 function renderMeal(kind,itemsId,totalId){
   const k=recKey();
@@ -4862,8 +4872,16 @@ setInterval(()=>{const n=new Date();if(n.getHours()===11&&n.getMinutes()<5)rende
 
 /* 初始化 */
 initSelectPage();
-/* 云端定时拉取（每30秒同步对方数据）*/
-setInterval(()=>{ if(_inApp&&cloudReady()&&!_syncing)doSync(null); }, 30000);
+/* 云端定时拉取（每30秒同步对方数据）；仅在页面可见时运行，隐藏即停，减少后台唤醒/发热 */
+let _syncTimer=null;
+function startSyncTimer(){ if(_syncTimer)return; _syncTimer=setInterval(()=>{ if(_inApp&&cloudReady()&&!_syncing)doSync(null); }, 30000); }
+function stopSyncTimer(){ if(_syncTimer){clearInterval(_syncTimer);_syncTimer=null;} }
+startSyncTimer();
+/* 页面可见性变化：隐藏即暂停全部动画+停同步定时器（省电降温），可见自动恢复，画面无变化 */
+document.addEventListener('visibilitychange',()=>{
+  document.body.classList.toggle('app-hidden',document.hidden);
+  if(document.hidden) stopSyncTimer(); else startSyncTimer();
+});
 
 /* 网络状态 → 同步图标（离线/恢复自动同步）*/
 if(typeof navigator!=='undefined'&&!navigator.onLine)setSyncStatus('offline');

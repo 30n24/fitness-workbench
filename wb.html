@@ -1704,7 +1704,7 @@ const MENUS = {
 const KEY='fitness_workbench_v2';
 let state=load();
 // 强制缓存更新：版本变化时清除所有 sw 缓存并硬刷新
-const APP_VER='51';
+const APP_VER='52';
 if(localStorage.getItem('app_ver')!==APP_VER){
   localStorage.setItem('app_ver',APP_VER);
   if('caches' in window)caches.keys().then(n=>{n.forEach(c=>{if(c.includes('fitness-workbench'))caches.delete(c);});}).then(()=>location.reload(true));
@@ -3647,41 +3647,18 @@ function showWaterCheer(n){
 }
 
 /* 自定义食物 */
-// 最近食物删除：删掉该食物「最近一条」历史记录（带确认，避免误删）
-function deleteRecentFood(name){
-  let best=null;
-  ['breakfast','lunch','dinner','eatOut'].forEach(function(kind){
-    if(best)return;
-    const f=profile()[kind]; if(!f)return;
-    Object.keys(f).sort().reverse().forEach(function(d){
-      if(best)return;
-      const arr=f[d]||[];
-      for(let i=arr.length-1;i>=0;i--){
-        const it=arr[i];
-        const nm=(typeof it==='object'?it.name:((DINNER_MENU[it]&&DINNER_MENU[it].n)||''));
-        if(nm===name){best={kind:kind,d:d,i:i};break;}
-      }
-    });
-  });
-  if(best){
-    const f=profile()[best.kind];
-    f[best.d].splice(best.i,1);
-    if(!f[best.d].length)delete f[best.d];
-    save();
-  }
-  renderRecentFood();renderDiet();
-}
-// 饮食页「最近食物」卡：从 早/午/晚/外食 历史派生，点击快速填入对应餐输入框，✕ 删除最近记录
+// 饮食页「最近食物」卡：从 早/午/晚/外食 历史派生，点击快速填入对应餐输入框，✕ 仅从建议列表隐藏（唔动历史记录）
 let _lastMealInput='breakfastInput';
 function renderRecentFood(){
   const list=document.getElementById('cfList');if(!list)return;
+  const hidden=profile().hiddenFoods||[];
   var recent=[],seen={};
   ['breakfast','lunch','dinner','eatOut'].forEach(function(kind){
     var f=profile()[kind]; if(!f)return;
     Object.keys(f).sort().reverse().forEach(function(d){
       (f[d]||[]).forEach(function(it){
         var nm=(typeof it==='object'?it.name:((DINNER_MENU[it]&&DINNER_MENU[it].n)||''));
-        if(nm&&!seen[nm]){seen[nm]=1;recent.push(nm);}
+        if(nm&&!seen[nm]&&!hidden.includes(nm)){seen[nm]=1;recent.push(nm);}
       });
     });
   });
@@ -3690,15 +3667,16 @@ function renderRecentFood(){
   const TH=6;
   recent.forEach(function(nm,i){
     const div=document.createElement('div');div.className='cf-item'+(i>=TH?' cf-hidden':'');
-    div.innerHTML='<span class="cf-name">'+nm+'</span><span class="cf-del" title="删除记录">✕</span>';
+    div.innerHTML='<span class="cf-name">'+nm+'</span><span class="cf-del" title="从建议列表隐藏">✕</span>';
     div.onclick=function(){
       var inp=document.getElementById(_lastMealInput)||document.getElementById('breakfastInput');
       if(inp){inp.value=nm;inp.focus();showFoodHint('已填入「'+nm+'」，可修改份量后撳「添加」');}
     };
     div.querySelector('.cf-del').onclick=function(e){
       e.stopPropagation();
-      if(!confirm('删除「'+nm+'」最近食物记录？'))return;
-      deleteRecentFood(nm);
+      var h=(profile().hiddenFoods||[]).slice();
+      if(!h.includes(nm)){h.push(nm);profile().hiddenFoods=h;save();}
+      renderRecentFood();renderDiet();
     };
     list.appendChild(div);
   });

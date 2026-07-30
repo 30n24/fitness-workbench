@@ -745,6 +745,9 @@ html.dark .dash-card{background:#171f30}
 .custom-food .cf-list .cf-hidden{display:none!important}
 .custom-food .cf-list.expanded .cf-hidden{display:flex!important}
 .custom-food .cf-list .lib-toggle{text-align:center;font-size:12px;color:var(--primary);font-weight:600;padding:7px 0;margin-top:3px;border:1px dashed var(--border);border-radius:8px;cursor:pointer}
+.custom-food .cf-list .hidden-item{display:none}
+.custom-food .cf-list.show-hidden .hidden-item{display:flex}
+.custom-food .cf-item .cf-show{color:var(--primary);cursor:pointer;margin-left:8px;font-weight:600}
 /* ===== 自定义动作 + AI 计卡 ===== */
 .custom-ex-card{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:14px;margin:14px 2px 0}
 .custom-ex-card .meal-row{display:flex;gap:8px;align-items:center}
@@ -1704,7 +1707,7 @@ const MENUS = {
 const KEY='fitness_workbench_v2';
 let state=load();
 // 强制缓存更新：版本变化时清除所有 sw 缓存并硬刷新
-const APP_VER='52';
+const APP_VER='53';
 if(localStorage.getItem('app_ver')!==APP_VER){
   localStorage.setItem('app_ver',APP_VER);
   if('caches' in window)caches.keys().then(n=>{n.forEach(c=>{if(c.includes('fitness-workbench'))caches.delete(c);});}).then(()=>location.reload(true));
@@ -3685,6 +3688,22 @@ function renderRecentFood(){
     t.textContent='展开全部 '+recent.length+' 种食物 ▾';
     t.onclick=function(){const c=list.classList.toggle('expanded');t.textContent=c?'收起 ▴':'展开全部 '+recent.length+' 种食物 ▾';};
     list.appendChild(t);
+  }
+  if(hidden.length){
+    const ht=document.createElement('div');ht.className='lib-toggle';
+    ht.textContent='已隐藏 '+hidden.length+' 项 ↺';
+    ht.onclick=function(){const c=list.classList.toggle('show-hidden');ht.textContent=c?'收起已隐藏 ▴':'已隐藏 '+hidden.length+' 项 ↺';};
+    list.appendChild(ht);
+    hidden.forEach(function(nm){
+      const div=document.createElement('div');div.className='cf-item hidden-item';
+      div.innerHTML='<span class="cf-name">'+nm+'</span><span class="cf-show" title="重新显示">↺</span>';
+      div.onclick=function(){
+        var h=profile().hiddenFoods.filter(function(x){return x!==nm;});
+        profile().hiddenFoods=h;save();
+        renderRecentFood();renderDiet();
+      };
+      list.appendChild(div);
+    });
   }
 }
 

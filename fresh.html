@@ -283,6 +283,8 @@ main{padding:14px 14px 20px;max-width:680px;margin:0 auto}
 .diet-summary .ds-row .ds-v{font-weight:700}
 .diet-summary .ds-row.total{margin-top:6px;padding-top:10px;border-top:2px solid var(--border);border-bottom:none}
 .diet-summary .ds-row.total .ds-v{color:var(--orange);font-size:16px}
+.diet-summary .ds-row.total.carb{border-top:1px dashed var(--border);padding-top:8px}
+.diet-summary .ds-row.total.carb .ds-v{color:var(--green);font-size:16px}
 /* 对方动态 */
 .partner-card{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:14px;margin:0 2px 12px}
 .partner-card .pc-head{display:flex;align-items:center;gap:8px;margin-bottom:10px}
@@ -1687,7 +1689,7 @@ const MENUS = {
 const KEY='fitness_workbench_v2';
 let state=load();
 // 强制缓存更新：版本变化时清除所有 sw 缓存并硬刷新
-const APP_VER='32';
+const APP_VER='33';
 if(localStorage.getItem('app_ver')!==APP_VER){
   localStorage.setItem('app_ver',APP_VER);
   if('caches' in window)caches.keys().then(n=>{n.forEach(c=>{if(c.includes('fitness-workbench'))caches.delete(c);});}).then(()=>location.reload(true));
@@ -3344,15 +3346,23 @@ function renderMeal(kind,itemsId,totalId){
   const k=recKey();
   const items=profile()[kind]?.[k]||[];
   const el=document.getElementById(itemsId);el.innerHTML='';
-  let total=0;
-  items.forEach((it,i)=>{total+=it.cal||0;
+  let total=0,totalCarb=0;
+  items.forEach((it,i)=>{total+=it.cal||0;totalCarb+=(it.carb||0);
     const div=document.createElement('div');div.className='meal-items mi';
     div.innerHTML=`<span class="mn">${it.name}</span><span class="mc">${it.cal}kcal</span>`+(it.carb?`<span class="md">${it.carb}g碳</span>`:'')+`<span class="edit" data-i="${i}">✎</span><span class="del" data-i="${i}">✕</span>`;
     div.querySelector('.del').onclick=()=>{const a=profile()[kind][k]||[];a.splice(i,1);profile()[kind][k]=a;save();renderMeal(kind,itemsId,totalId);renderDietSummary();};
-    div.querySelector('.edit').onclick=()=>{const nv=prompt('修正卡路里(kcal)：',it.cal);if(nv!==null){const v=parseInt(nv);if(!isNaN(v)){it.cal=v;profile()[kind][k]=items;save();renderMeal(kind,itemsId,totalId);renderDietSummary();}}};
+    div.querySelector('.edit').onclick=()=>{
+      const nv=prompt('修正热量(kcal)：',it.cal);
+      if(nv!==null){const v=parseInt(nv);if(!isNaN(v)){
+        it.cal=v;
+        const cv=prompt('修正碳水(g)：',it.carb||0);
+        if(cv!==null){const c=parseInt(cv);if(!isNaN(c)){it.carb=c;}}
+        profile()[kind][k]=items;save();renderMeal(kind,itemsId,totalId);renderDietSummary();
+      }}
+    };
     el.appendChild(div);
   });
-  document.getElementById(totalId).innerHTML=`合计 <b>${total}kcal</b>`;
+  document.getElementById(totalId).innerHTML=`合计 <b>${total}kcal</b>`+(totalCarb?` · <b>${totalCarb}g碳</b>`:'');
 }
 function renderBreakfast(){renderMeal('breakfast','breakfastItems','breakfastTotal');}
 function renderLunch(){renderMeal('lunch','lunchItems','lunchTotal');}
@@ -3373,17 +3383,21 @@ function migrateDinner(){
 }
 function renderDietSummary(){
   const k=recKey();
-  const bf=(profile().breakfast?.[k]||[]).reduce((s,it)=>s+it.cal,0);
-  const ln=(profile().lunch?.[k]||[]).reduce((s,it)=>s+it.cal,0);
-  const dn=(profile().dinner?.[k]||[]).reduce((s,it)=>s+((typeof it==='object'?it.cal:(DINNER_MENU[it]?.cal||0))||0),0);
-  const eo=(profile().eatOut?.[k]||[]).reduce((s,it)=>s+it.cal,0);
-  const total=bf+ln+dn+eo;
+  const bfI=(profile().breakfast?.[k]||[]), lnI=(profile().lunch?.[k]||[]);
+  const dnI=(profile().dinner?.[k]||[]).map(x=>typeof x==='object'?x:{name:DINNER_MENU[x]?.n||'',cal:DINNER_MENU[x]?.cal||0,carb:DINNER_MENU[x]?.carb||0});
+  const eoI=(profile().eatOut?.[k]||[]);
+  const bf=bfI.reduce((s,it)=>s+it.cal,0), bfC=bfI.reduce((s,it)=>s+(it.carb||0),0);
+  const ln=lnI.reduce((s,it)=>s+it.cal,0), lnC=lnI.reduce((s,it)=>s+(it.carb||0),0);
+  const dn=dnI.reduce((s,it)=>s+it.cal,0), dnC=dnI.reduce((s,it)=>s+(it.carb||0),0);
+  const eo=eoI.reduce((s,it)=>s+it.cal,0), eoC=eoI.reduce((s,it)=>s+(it.carb||0),0);
+  const total=bf+ln+dn+eo, totalCarb=bfC+lnC+dnC+eoC;
   document.getElementById('dietSummary').innerHTML=
-    `<div class="ds-row"><span>🍳 早餐</span><span class="ds-v">${bf}kcal</span></div>`+
-    `<div class="ds-row"><span>🍱 午餐</span><span class="ds-v">${ln}kcal</span></div>`+
-    `<div class="ds-row"><span>🍽️ 晚餐</span><span class="ds-v">${dn}kcal</span></div>`+
-    (eo?`<div class="ds-row"><span>🍴 外食</span><span class="ds-v">${eo}kcal</span></div>`:'')+
-    `<div class="ds-row total"><span>今日总热量</span><span class="ds-v">${total}kcal</span></div>`;
+    `<div class="ds-row"><span>🍳 早餐</span><span class="ds-v">${bf}kcal · ${bfC}g碳</span></div>`+
+    `<div class="ds-row"><span>🍱 午餐</span><span class="ds-v">${ln}kcal · ${lnC}g碳</span></div>`+
+    `<div class="ds-row"><span>🍽️ 晚餐</span><span class="ds-v">${dn}kcal · ${dnC}g碳</span></div>`+
+    (eo?`<div class="ds-row"><span>🍴 外食</span><span class="ds-v">${eo}kcal · ${eoC}g碳</span></div>`:'')+
+    `<div class="ds-row total"><span>今日总热量</span><span class="ds-v">${total}kcal</span></div>`+
+    `<div class="ds-row total carb"><span>今日总碳水</span><span class="ds-v">${totalCarb}g</span></div>`;
   // 对方今晚吃了什么（兼容旧版"菜单序号"与新版"自主输入条目"）
   const pp=curProfile==='A'?'B':'A';
   const pd=(state[pp].dinner?.[k]||[]).map(x=>(typeof x==='object'?x.name:(DINNER_MENU[x]?.n||''))).filter(Boolean);

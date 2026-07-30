@@ -1702,7 +1702,7 @@ const MENUS = {
 const KEY='fitness_workbench_v2';
 let state=load();
 // 强制缓存更新：版本变化时清除所有 sw 缓存并硬刷新
-const APP_VER='42';
+const APP_VER='43';
 if(localStorage.getItem('app_ver')!==APP_VER){
   localStorage.setItem('app_ver',APP_VER);
   if('caches' in window)caches.keys().then(n=>{n.forEach(c=>{if(c.includes('fitness-workbench'))caches.delete(c);});}).then(()=>location.reload(true));
@@ -1939,8 +1939,8 @@ function initSelectPage(){
       enterApp();
     };
   });
-  document.getElementById('nameA').oninput=e=>{document.getElementById('nameA-display').textContent=e.target.value||'计划 A'};
-  document.getElementById('nameB').oninput=e=>{document.getElementById('nameB-display').textContent=e.target.value||'计划 B'};
+  document.getElementById('nameA').oninput=e=>{ const v=e.target.value; document.getElementById('nameA-display').textContent=v||'计划 A'; state.A.name=v.trim(); saveLocal(); };
+  document.getElementById('nameB').oninput=e=>{ const v=e.target.value; document.getElementById('nameB-display').textContent=v||'计划 B'; state.B.name=v.trim(); saveLocal(); };
   renderHomeDash();
   // 首页打开即强制拉取云端并显示概要（解决主屏首屏看不到数据）
   if(cloudReady()){

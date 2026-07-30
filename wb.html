@@ -1705,7 +1705,7 @@ const MENUS = {
 const KEY='fitness_workbench_v2';
 let state=load();
 // 强制缓存更新：版本变化时清除所有 sw 缓存并硬刷新
-const APP_VER='46';
+const APP_VER='47';
 if(localStorage.getItem('app_ver')!==APP_VER){
   localStorage.setItem('app_ver',APP_VER);
   if('caches' in window)caches.keys().then(n=>{n.forEach(c=>{if(c.includes('fitness-workbench'))caches.delete(c);});}).then(()=>location.reload(true));
@@ -3457,11 +3457,14 @@ function renderCalorieSummary(){
       calTotal.textContent=foodCal+'kcal';   // 饮食摄入（吃进来嘅）
       calBurn.textContent=exCal+'kcal';       // 运动消耗（记录值，仅参考）
       if(tdee!=null){
-        const burn=tdee+exCal;                 // 实际总消耗 = 估算日常消耗(含活动系数) + 记录运动(有氧/羽毛球/力量)
+        const bmr=bmrOf(curProfile)||0;
+        const act=(state[curProfile].meta&&state[curProfile].meta.activity)||1;
+        const neRatio=Math.min(act-1,0.375);   // 非训练日常活动比例：活动系数含训练假设，封顶轻度活动(0.375)以免重复计入已记录训练
+        const burn=Math.round(bmr*(1+neRatio)+exCal); // 严格口径：基础代谢 + 非训练日常活动 + 实际记录运动(有氧/羽毛球/力量)，训练只计一次
         const def=burn-foodCal;                // 真正热量缺口 = 实际总消耗 − 摄入
         const cls=def>0?'cal-neg':'cal-pos';  // 缺口达标(绿) / 盈余(橙)
         const tag=def>0?('缺口达标 +'+def+'kcal'):('高于消耗，盈余 +'+(-def)+'kcal');
-        calDetail.innerHTML=`📊 实际总消耗 <b>${burn}</b>kcal（含记录运动 ${exCal}kcal）· 📉 热量缺口 <b class="${cls}">${Math.abs(def)}</b>kcal <span class="${cls}">（${tag}）</span>`;
+        calDetail.innerHTML=`📊 实际总消耗 <b>${burn}</b>kcal（基础+日常+记录运动 ${exCal}kcal）· 📉 热量缺口 <b class="${cls}">${Math.abs(def)}</b>kcal <span class="${cls}">（${tag}）</span>`;
       } else {
         const net=foodCal-exCal;
         calDetail.innerHTML=`运动消耗(记录) ${exCal}kcal · 净额 ${net>=0?'+':''}${net}kcal <span style="color:var(--muted)">· 去身体页填代谢参数算真正缺口</span>`;

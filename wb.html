@@ -831,6 +831,8 @@ html.dark .dash-card{background:#171f30}
       <input type="text" id="aiBase" placeholder="https://api.deepseek.com/v1">
       <label>模型名</label>
       <input type="text" id="aiModel" placeholder="deepseek-chat">
+      <label style="margin-top:10px">USDA 营养库 Key（可选·免费·提升准确度）</label>
+      <input type="password" id="aiUsda" placeholder="留空用 DEMO_KEY（限流），可到 fdc.nal.usda.gov 免费申请" autocomplete="off">
       <div class="ai-actions">
         <button class="ai-save" id="aiSave">保存</button>
         <button class="ai-test" id="aiTest">测试</button>
@@ -1678,7 +1680,7 @@ const MENUS = {
 const KEY='fitness_workbench_v2';
 let state=load();
 // 强制缓存更新：版本变化时清除所有 sw 缓存并硬刷新
-const APP_VER='23';
+const APP_VER='24';
 if(localStorage.getItem('app_ver')!==APP_VER){
   localStorage.setItem('app_ver',APP_VER);
   if('caches' in window)caches.keys().then(n=>{n.forEach(c=>{if(c.includes('fitness-workbench'))caches.delete(c);});}).then(()=>location.reload(true));
@@ -4057,6 +4059,7 @@ function openAiCfg(){
   document.getElementById('aiKey').value=cfg.key||'';
   document.getElementById('aiBase').value=cfg.base||d.base;
   document.getElementById('aiModel').value=cfg.model||d.model;
+  const usdaEl=document.getElementById('aiUsda');if(usdaEl)usdaEl.value=cfg.usda||'';
   document.getElementById('aiMsg').textContent='';
   m.classList.add('show');
 }
@@ -4074,37 +4077,140 @@ function fmtAIError(e){
   if(/Failed to fetch|NetworkError|TypeError.*fetch|CORS|跨域/i.test(m)) return '网络或跨域问题：默认 DeepSeek 允许浏览器跨域；OpenAI/自定义接口要保证对方支持 CORS 🌐';
   return 'AI 查询失败：'+m.slice(0,120);
 }
+/* 把一条食物登记到当前餐（本地库 / USDA / AI 三种来源共用） */
+function registerMeal(kind,name,cal,carb,inputId){
+  name=(name||'').trim()||'食物';
+  if(!profile()[kind])profile()[kind]={};
+  if(!profile()[kind][recKey()])profile()[kind][recKey()]=[];
+  profile()[kind][recKey()].push({name,cal,carb,matched:name});
+  save();
+  const inp=document.getElementById(inputId);if(inp)inp.value='';
+  if(kind==='breakfast')renderBreakfast();else if(kind==='lunch')renderLunch();else if(kind==='dinner')renderDinner();
+  else if(typeof renderEatOut==='function')renderEatOut();
+  renderDietSummary();
+  return {name,cal,carb};
+}
+/* 从描述里提取「食物名」用于查 USDA（去掉数量/量词/连接词） */
+function extractFoodQuery(text){
+  let s=(text||'').trim()
+    .replace(/[0-9]+(?:\.[0-9]+)?/g,'')
+    .replace(/[一二三四五六七八九十百零两双半几数俩]+/g,'')
+    .replace(/[个只根条片碗杯块份把颗粒串瓣两斤]+/g,'')   // 中文量词（不含拉丁字母，避免误删 broccoli/salmon 中的 l/m）
+    .replace(/\b(g|ml|cal|kcal)\b/gi,'')                   // 拉丁量词仅整体移除，不动单词内字母
+    .replace(/[炒蒸煮拌烧烤煎炸炖卤凉拼配和与大份小加另及、，,；;：:。·与]+/g,' ')
+    .replace(/\s+/g,' ').trim();
+  return s;
+}
+/* 从描述里取克数（复用本地量词规则；无数量默认 100g） */
+function parseGramsForUsda(text){
+  text=(text||'').trim();
+  const nm=text.match(_NUM_RE);
+  if(nm){
+    const v=cnNumToArabic(nm[1]);
+    if(!isNaN(v)){
+      const qty=v, rest=text.slice(nm[0].length);
+      const mm=rest.match(_MW_RE);
+      if(mm){
+        const mw=mm[0].toLowerCase();
+        if(/^(g|克|毫升|ml)$/.test(mw)) return {grams:qty,note:qty+'g',explicit:true};
+        if(mw==='两') return {grams:qty*50,note:qty+'两',explicit:true};
+        if(mw==='斤') return {grams:qty*500,note:qty+'斤',explicit:true};
+        return {grams:qty*100,note:qty+mw,explicit:true};
+      }
+      return {grams:qty,note:qty+'g',explicit:true}; // 裸数字=克
+    }
+  }
+  return {grams:100,note:'100g(默认)',explicit:false};
+}
+/* 在 USDA 候选里挑最合适的食物：剔除加工/成品形态，偏好生鲜原料 */
+const USDA_PENALTY=['oil','dehydrated','dehydr','flour','bread','breaded','battered','fried','fry','frozen','canned','tinned','sweetened','sweet','sugar','sauce','dressing','dried','candied','glazed','creamed','cream','gravy','soup','broth','puree','instant','mix','prepared','restaurant','babyfood','infant','lunchmeat','deli','processed','smoked','cured','sausage','frankfurter','hotdog','nugget','patty','syrup','jam','jelly','ketchup','mayonnaise','beverage','drink','pop','soda','tenders','roll','oven','roast'];
+function selectUsdaFood(foods,q){
+  q=(''+q).toLowerCase();
+  let best=null,bestScore=-1e9;
+  for(const f of foods){
+    const desc=(''+f.description).toLowerCase();
+    let kc=null,cb=null;
+    for(const n of (f.foodNutrients||[])){
+      const nm=n.nutrientName||'',un=n.unitName||'';
+      if(nm==='Energy'&&un==='KCAL')kc=n.value;
+      if(nm==='Carbohydrate, by difference'&&un==='g')cb=n.value;
+    }
+    let score=(+f.score||0);
+    for(const p of USDA_PENALTY){ if(desc.includes(p)&&!q.includes(p)) score-=120; }
+    if(desc.includes('raw')||desc.includes('whole')) score+=15;
+    if(desc.includes('boneless')||desc.includes('skinless')) score+=10;
+    if(score>bestScore){ bestScore=score; best=f; best._kcal=(kc!=null&&!isNaN(kc))?+kc:null; best._carb=(cb!=null&&!isNaN(cb))?+cb:0; }
+  }
+  return best;
+}
+/* USDA FoodData Central：免费权威营养库（覆盖薄荷/MyFitnessPal 级原料数据），浏览器可直接跨域调用 */
+async function usdaLookupFood(raw,kind,inputId){
+  raw=(raw||'').trim();
+  const q=extractFoodQuery(raw);
+  if(!q) return {ok:false,reason:'empty'};
+  const cfg=getAICfg()||{};
+  const key=(cfg.usda&&cfg.usda.trim())||'DEMO_KEY';
+  const g=parseGramsForUsda(raw);
+  const url='https://api.nal.usda.gov/fdc/v1/foods/search?api_key='+encodeURIComponent(key)
+    +'&query='+encodeURIComponent(q)+'&pageSize=10&dataType=Foundation%2CSR%20Legacy';
+  const ctrl=new AbortController();const to=setTimeout(()=>ctrl.abort(),9000);
+  let data;
+  try{
+    const resp=await fetch(url,{signal:ctrl.signal});
+    if(!resp.ok)throw new Error('HTTP '+resp.status);
+    data=await resp.json();
+  }catch(e){clearTimeout(to);return {ok:false,reason:'net:'+(e.message||e)};}
+  finally{clearTimeout(to);}
+  const foods=(data&&data.foods)||[];
+  if(!foods.length)return {ok:false,reason:'noresult'};
+  const pick=selectUsdaFood(foods,q);
+  if(!pick)return {ok:false,reason:'noresult'};
+  let per100kcal=pick._kcal,per100carb=pick._carb;
+  if(per100kcal==null){ // search 内嵌营养不全 → 拉全量
+    try{
+      const fresp=await fetch('https://api.nal.usda.gov/fdc/v1/food/'+pick.fdcId+'?api_key='+encodeURIComponent(key));
+      const fd=await fresp.json();
+      for(const n of (fd.foodNutrients||[])){
+        const nm=(n.nutrient&&n.nutrient.name)||n.nutrientName||'';
+        const un=(n.nutrient&&n.nutrient.unitName)||n.unitName||'';
+        const val=(n.amount!=null?n.amount:n.value);
+        if(nm==='Energy'&&un==='kcal')per100kcal=val;
+        if(nm==='Carbohydrate, by difference'&&un==='g')per100carb=val;
+      }
+    }catch(e){}
+  }
+  if(per100kcal==null||isNaN(per100kcal))return {ok:false,reason:'nonutrient'};
+  per100kcal=+per100kcal;per100carb=per100carb!=null?+per100carb:0;
+  const grams=g.grams;
+  let cal=Math.round(per100kcal*grams/100),carb=Math.round(per100carb*grams/100);
+  if(cal<0)cal=0;
+  const name=(''+pick.description).split(',')[0].replace(/\braw\b/i,'生').trim()||q;
+  const note=(g.note?('按'+g.note+'；'):'')+'USDA权威库';
+  const r=registerMeal(kind,name,cal,carb,inputId);
+  return {ok:true,name:r.name,cal,carb,note,rawName:pick.description};
+}
 async function aiLookupFood(raw,kind,inputId){
   raw=(raw||'').trim();
   if(!raw){showFoodHint('先输入食物名称');return;}
   // 把一次本地匹配结果登记到当前餐（库优先 / 无 Key 兜底都用它）
-  const applyLocal=(m)=>{
-    const name=m.matched||raw, cal=m.cal, carb=m.carb;
-    if(!profile()[kind])profile()[kind]={};
-    if(!profile()[kind][recKey()])profile()[kind][recKey()]=[];
-    profile()[kind][recKey()].push({name,cal,carb,matched:name});
-    save();
-    const inp=document.getElementById(inputId);if(inp)inp.value='';
-    if(kind==='breakfast')renderBreakfast();else if(kind==='lunch')renderLunch();else renderDinner();
-    renderDietSummary();
-    return {name,cal,carb};
-  };
+  const applyLocal=(m)=>registerMeal(kind,m.matched||raw,m.cal,m.carb,inputId);
   const cfg=getAICfg();
-  // 0) 未配 Key：先尝试本地标准库兜底（有网/无网都能用）
-  if(!cfg||!cfg.key){
-    const m=matchFoodCal(raw);
-    if(!m.fuzzy && m.parts.length){ const r=applyLocal(m); showFoodHint('📚 本地库：'+r.name+' ≈ '+r.cal+'kcal / '+r.carb+'g碳（未配AI Key）'); }
-    else { showFoodHint('未配置 AI：去「数据管理 → 🤖 AI 查热量」填写 Key'); openAiCfg(); }
-    return;
-  }
-  // 1) 库优先（参照薄荷/MyFitnessPal：标准库命中即秒回，不浪费 AI）
+  const hasAI=!!(cfg&&cfg.key);
+  // 1) 本地标准库优先（参照薄荷/MyFitnessPal：库命中即秒回，不浪费网络）
   const local=matchFoodCal(raw);
   if(!local.fuzzy && local.parts.length){
     const r=applyLocal(local);
     showFoodHint('📚 本地库（优先）：'+r.name+' ≈ '+r.cal+'kcal / '+r.carb+'g碳');
     return;
   }
-  // 2) 库里查不到 → 才调 AI
+  // 2) USDA 权威营养库（免费·跨域·无需 AI Key，覆盖生鲜/原料级准确度，对标市面 app）
+  showFoodHint('🔍 正在用 USDA 营养库查询「'+raw+'」…');
+  try{
+    const u=await usdaLookupFood(raw,kind,inputId);
+    if(u.ok){ showFoodHint('🌿 USDA 权威库：'+u.name+' ≈ '+u.cal+'kcal / '+u.carb+'g碳'+(u.note?('（'+u.note+'）'):'')); return; }
+  }catch(e){}
+  // 3) 本地库 + USDA 都没命中 → 才调 AI（中式品牌/菜品/复杂描述）
+  if(!hasAI){ showFoodHint('USDA 也查不到：去「数据管理 → 🤖 AI 查热量」填 Key，或填 USDA Key 提升覆盖'); openAiCfg(); return; }
   showFoodHint('🔍 正在用 AI 查询「'+raw+'」热量…');
   try{
     const sys=`你是专业营养师，依据《中国食物成分表》第6版及主流连锁品牌的官方营养数据估算。用户给你一个食物描述（可能含份量/做法/口语/品牌/糖度。
@@ -4533,9 +4639,10 @@ document.getElementById('aiSave').onclick=function(){
   const key=document.getElementById('aiKey').value.trim();
   const base=document.getElementById('aiBase').value.trim();
   const model=document.getElementById('aiModel').value.trim();
+  const usda=(document.getElementById('aiUsda').value||'').trim();
   if(!key){document.getElementById('aiMsg').textContent='⚠️ 请填写 API Key';return;}
   if(!base){document.getElementById('aiMsg').textContent='⚠️ 请填写接口地址';return;}
-  saveAICfg({provider,key,base,model});updateAiButtons();
+  saveAICfg({provider,key,base,model,usda});updateAiButtons();
   document.getElementById('aiMsg').textContent='✅ 已保存（Key 仅存本机）';
   setTimeout(()=>document.getElementById('aiModal').classList.remove('show'),700);
 };

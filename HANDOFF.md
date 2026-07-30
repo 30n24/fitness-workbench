@@ -1,7 +1,7 @@
 # 健身计划工作台（fitness-workbench）续接说明
 
 > 用途：新开任务会话时，把本文件内容贴给 AI，它即可无缝衔接，不必重新了解项目。
-> 最后更新：v39（2026-07-30）。代码托管：GitHub Pages `30n24/fitness-workbench`。
+> 最后更新：v40（2026-07-30）。代码托管：GitHub Pages `30n24/fitness-workbench`。
 
 ---
 
@@ -79,6 +79,7 @@
 | v37 | 修复概览页计划 B 部位分布缺失+英文（renderStats 的 partNames 对齐 PARTS_B，并兼容 classifyPart 写入的纯 key） |
 | v38 | 降发热：页面隐藏(`visibilitychange`)即暂停全部 `infinite` 动画（`app-hidden` 类）+ 停 30s 云同步定时器；`foodList` datalist 按「自定义食物签名」缓存，仅变化时重建。画面使用时完全不变 |
 | v39 | 概览页计划 B 部位分布改为列出该计划全部 5 个部位（胸/肩/背/腹/腿），含 0 次的也显示；合并 `PARTS_B` 的 `_b` 后缀 key 与 `classifyPart` 写入的纯 key 一起计数 |
+| v40 | 修复手机顶部状态栏（时间/电量）被顶栏覆盖：`.topbar` 吸顶锚点 `top:0`→`top:var(--safe-t)`，并用 `::before` 把背景铺到状态栏底下（无缝）；不动顶栏高度，部位栏/动作搜索栏吸顶不受影响 |
 
 ---
 

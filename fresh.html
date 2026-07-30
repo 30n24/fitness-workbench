@@ -1702,7 +1702,7 @@ const MENUS = {
 const KEY='fitness_workbench_v2';
 let state=load();
 // 强制缓存更新：版本变化时清除所有 sw 缓存并硬刷新
-const APP_VER='41';
+const APP_VER='42';
 if(localStorage.getItem('app_ver')!==APP_VER){
   localStorage.setItem('app_ver',APP_VER);
   if('caches' in window)caches.keys().then(n=>{n.forEach(c=>{if(c.includes('fitness-workbench'))caches.delete(c);});}).then(()=>location.reload(true));
@@ -4471,36 +4471,43 @@ async function aiLookupFood(raw,kind,inputId){
 }
 
 /* ===== 自定义动作 + AI 辅助计卡（类比食物记录） ===== */
+function normUnit(u){
+  u=(''+(u||'')).toLowerCase();
+  if(/磅|lb/.test(u))return 'lb';
+  if(/斤|jin/.test(u))return '斤';
+  return 'kg';
+}
+function unitFactor(u){ return u==='lb'?0.4536 : u==='斤'?0.5 : 1; }
 function parseExPerf(text){
   let s=(''+text).replace(/，/g,',')
   const sep=/[、/→\-]|->/;
-  let wSeq=null,rSeq=null;
+  let wSeq=null,rSeq=null, unit=null, wraw=null;
   // 重量序列：60/50/40/30kg 或 20→30→40kg（捕获完整序列，而非末一对）
-  const wm=s.match(/((?:\d+(?:\.\d+)?(?:[、/→\-]|->))+\d+(?:\.\d+)?)\s*(kg|公斤|千克|磅|jin|斤)/i);
-  if(wm){ wSeq=wm[1].split(sep).map(Number); s=s.replace(wm[0],' '); }
+  const wm=s.match(/((?:\d+(?:\.\d+)?(?:[、/→\-]|->))+\d+(?:\.\d+)?)\s*(kg|公斤|千克|磅|lb|jin|斤)/i);
+  if(wm){ wSeq=wm[1].split(sep).map(Number); unit=unit||normUnit(wm[2]); wraw=wSeq[wSeq.length-1]; s=s.replace(wm[0],' '); }
   // 次数序列：12/10/8/6次
   const rm=s.match(/((?:\d+(?:\.\d+)?(?:[、/→\-]|->))+\d+(?:\.\d+)?)\s*次/i);
   if(rm){ rSeq=rm[1].split(sep).map(Number); s=s.replace(rm[0],' '); }
   // 链式 组x次x负重（支持带单位后缀），优先于单重量匹配，避免单重量被提前删除破坏解析
   let sets=null,reps=null,weight=null;
-  const chain=s.match(/(\d+)\s*[x×X*]\s*(\d+)\s*[x×X*]\s*(\d+(?:\.\d+)?)\s*(kg|公斤|千克|磅|jin|斤)?/i);
-  if(chain){ if(sets==null)sets=parseInt(chain[1]); reps=parseInt(chain[2]); let w=parseFloat(chain[3]); if(chain[4]&&/磅/i.test(chain[4]))w*=0.4536; weight=w; s=s.replace(chain[0],' '); }
+  const chain=s.match(/(\d+)\s*[x×X*]\s*(\d+)\s*[x×X*]\s*(\d+(?:\.\d+)?)\s*(kg|公斤|千克|磅|lb|jin|斤)?/i);
+  if(chain){ if(sets==null)sets=parseInt(chain[1]); reps=parseInt(chain[2]); const ru=normUnit(chain[4]||'kg'); unit=unit||ru; const rw=parseFloat(chain[3]); weight=rw*unitFactor(ru); wraw=rw; s=s.replace(chain[0],' '); }
   const sm=s.match(/(\d+)\s*组/); if(sm&&sets==null)sets=parseInt(sm[1]);
   const rm2=s.match(/(\d+)\s*次/); if(rm2&&reps==null)reps=parseInt(rm2[1]);
-  const wm2=s.match(/(\d+(?:\.\d+)?)\s*(?:kg|公斤|千克|磅|jin|斤)/i);
-  if(wm2){ if(weight==null){weight=parseFloat(wm2[1]); if(/磅/i.test(wm2[0]))weight*=0.4536;} s=s.replace(wm2[0],' '); }
-  if(wSeq&&wSeq.length)weight=wSeq[wSeq.length-1];
+  const wm2=s.match(/(\d+(?:\.\d+)?)\s*(?:kg|公斤|千克|磅|lb|jin|斤)/i);
+  if(wm2){ if(weight==null){ const ru=normUnit(wm2[0]); unit=unit||ru; const rw=parseFloat(wm2[1]); weight=rw*unitFactor(ru); wraw=rw; } s=s.replace(wm2[0],' '); }
+  if(wSeq&&wSeq.length){ if(weight==null){unit=unit||'kg'; weight=wSeq[wSeq.length-1]*unitFactor(unit);} wraw=null; }
   let detail=null;
   if(wSeq||rSeq){
     const n=Math.max(wSeq?wSeq.length:0, rSeq?rSeq.length:0, sets||0);
-    detail=[];
-    for(let i=0;i<n;i++) detail.push({weight: wSeq?(wSeq[i]!=null?wSeq[i]:wSeq[wSeq.length-1]):weight, reps: rSeq?(rSeq[i]!=null?rSeq[i]:rSeq[rSeq.length-1]):reps});
+    detail=[]; const fu=unitFactor(unit||'kg');
+    for(let i=0;i<n;i++){ const raw=wSeq?(wSeq[i]!=null?wSeq[i]:wSeq[wSeq.length-1]):null; const w=raw!=null?raw*fu:weight; detail.push({weight:w, rweight: raw!=null?raw:weight, runit: unit||'kg', reps: rSeq?(rSeq[i]!=null?rSeq[i]:rSeq[rSeq.length-1]):reps}); }
     if(sets==null)sets=n; if(reps==null)reps=(rSeq?rSeq[rSeq.length-1]:10); if(weight==null)weight=0;
   }
-  let name=s.replace(/[\dx×X*组次kg公斤千克磅jin斤]+/gi,'').replace(/[，,。.、/→\-]/g,'').replace(/(递减|递增|金字塔)/g,'').replace(/\s+/g,'').trim();
-  if(!name)name=(''+text).replace(/[\dx×X*]+/g,'').replace(/(组|次|kg|公斤|千克|磅)+/gi,'').replace(/\s+/g,'').trim()||(''+text).trim();
+  let name=s.replace(/[\dx×X*组次kg公斤千克磅lbjin斤]+/gi,'').replace(/[，,。.、/→\-]/g,'').replace(/(递减|递增|金字塔)/g,'').replace(/\s+/g,'').trim();
+  if(!name)name=(''+text).replace(/[\dx×X*]+/g,'').replace(/(组|次|kg|公斤|千克|磅|lb)+/gi,'').replace(/\s+/g,'').trim()||(''+text).trim();
   if(sets==null)sets=3; if(reps==null)reps=10;
-  return {name,sets,reps,weight,detail};
+  return {name,sets,reps,weight,detail,wunit:unit||'kg',wraw:wraw};
 }
 // 抗阻训练热量估算（MET 公式）：kcal = MET × 体重(kg) × 时间(h)
 // MET 按负重相对强度分级，大肌群复合动作加权，每组时间含动作+间歇
@@ -4592,12 +4599,14 @@ function renderExParts(){
   else summary='动作未识别到部位，补充动作名（如「深蹲」「卧推」）可自动归类';
   el.innerHTML=html+'<div class="ep-sum">'+summary+'</div>';
 }
-function addCustomEx(name,sets,reps,weight,cal,note,ai,part,detail){
+function addCustomEx(name,sets,reps,weight,cal,note,ai,part,detail,wunit,wraw){
   const pk=part||classifyPart(name);
+  const wu = wunit || (detail&&detail.length&&detail[0]&&detail[0].runit) || 'kg';
+  const wr = (wraw!=null)? wraw : (detail&&detail.length? null : weight);
   const calFinal = cal!=null?cal : (detail&&detail.length? estExCalFromDetail(detail,name) : estExCal(sets,reps,weight,name));
   if(!profile().customEx)profile().customEx={};
   const k=recKey(); if(!profile().customEx[k])profile().customEx[k]=[];
-  profile().customEx[k].push({name,sets,reps,weight:weight||0,cal:calFinal,note:note||'',ai:!!ai,done:true,part:pk,detail:detail||null});
+  profile().customEx[k].push({name,sets,reps,weight:weight||0,wunit:wu,wraw:(wr!=null?wr:null),cal:calFinal,note:note||'',ai:!!ai,done:true,part:pk,detail:detail||null});
   // 记录进步曲线
   const setsData=detail&&detail.length
     ? detail.map(d=>({weight:d.weight||weight||0,reps:d.reps||reps||10}))
@@ -4606,8 +4615,8 @@ function addCustomEx(name,sets,reps,weight,cal,note,ai,part,detail){
   // 写入「我的动作库」（历史，去重，更新上次表现）
   if(!profile().exLib)profile().exLib=[];
   const lib=profile().exLib.find(x=>x.name===name);
-  if(lib){lib.sets=sets;lib.reps=reps;lib.weight=weight||0;lib.cal=calFinal;lib.part=pk;lib.detail=detail||lib.detail;}
-  else profile().exLib.push({name,sets,reps,weight:weight||0,cal:calFinal,part:pk,detail:detail||null});
+  if(lib){lib.sets=sets;lib.reps=reps;lib.weight=weight||0;lib.cal=calFinal;lib.part=pk;lib.detail=detail||lib.detail;lib.wunit=wu;lib.wraw=(wr!=null?wr:null);}
+  else profile().exLib.push({name,sets,reps,weight:weight||0,cal:calFinal,part:pk,detail:detail||null,wunit:wu,wraw:(wr!=null?wr:null)});
   save();renderCustomEx();renderExLib();renderExParts();renderCalorieSummary();if(curPage==='stats')renderStats();
 }
 function renderExLib(){
@@ -4622,11 +4631,11 @@ function renderExLib(){
     item.querySelector('.el-add').onclick=()=>{
       let perf;
       if(e.detail&&e.detail.length){
-        const ws=e.detail.map(d=>d.weight>0?d.weight:null).filter(v=>v!=null);
+        const ws=e.detail.map(d=> d.rweight!=null&&d.rweight>0 ? d.rweight+d.runit : (d.weight>0?d.weight+'kg':null)).filter(v=>v!=null);
         const rs=e.detail.map(d=>d.reps);
-        perf=e.name+' '+(e.detail.length)+'组'+(ws.length?(' '+ws.join('/')+'kg'):'')+' '+(rs.length?rs.join('/')+'次':'');
+        perf=e.name+' '+(e.detail.length)+'组'+(ws.length?(' '+ws.join('/')):'')+' '+(rs.length?rs.join('/')+'次':'');
       } else {
-        perf=e.name+' '+(e.sets||3)+'组x'+(e.reps||10)+'次'+(e.weight?('x'+e.weight+'kg'):'');
+        perf=e.name+' '+(e.sets||3)+'组x'+(e.reps||10)+'次'+(e.wraw!=null&&e.wraw>0?('x'+e.wraw+e.wunit):(e.weight?('x'+e.weight+'kg'):''));
       }
       const inp=document.getElementById('exInput');inp.value=perf;inp.focus();
       showFoodHint('已填入「'+perf+'」，确认或改完撳「添加」（或 🔍AI 更准）');
@@ -4649,8 +4658,8 @@ function renderCustomEx(){
   el.innerHTML='';
   list.forEach((e,i)=>{
     const meta=(e.detail&&e.detail.length)
-      ? e.detail.map(d=> d.weight>0 ? (d.weight+'×'+(d.reps||'?')) : ((d.reps||'?')+'次自重')).join(' / ')
-      : ((e.sets||'?')+'组·'+(e.reps||'?')+'次'+(e.weight?('·'+e.weight+'kg'):'（自重）'));
+      ? e.detail.map(d=> d.rweight!=null&&d.rweight>0 ? (d.rweight+d.runit+'×'+(d.reps||'?')) : (d.weight>0?(d.weight+'kg×'+(d.reps||'?')):((d.reps||'?')+'次自重'))).join(' / ')
+      : ((e.sets||'?')+'组·'+(e.reps||'?')+'次'+(e.wraw!=null&&e.wraw>0?('·'+e.wraw+e.wunit):(e.weight?('·'+e.weight+'kg'):'（自重）')));
     const kindTag=(e.detail&&e.detail.length>1)?('<span class="ce-kind">'+setKindTag(e.detail)+'</span>'):'';
     const pi=TRAIN_PARTS.find(x=>x.key===e.part);
     const div=document.createElement('div');div.className='ce-item'+(e.done?' on':'');
@@ -4666,8 +4675,8 @@ function renderCustomEx(){
     };
     div.querySelector('.ce-edit').onclick=()=>{
       const txt=(e.detail&&e.detail.length)
-        ? e.name+' '+(e.detail.length)+'组'+(e.detail.map(d=>d.weight).filter(v=>v>0).join('/')).replace(/(.)$/,'$1kg')+(' '+(e.detail.map(d=>d.reps).join('/'))+'次')
-        : e.name+' '+(e.sets||'?')+'组x'+(e.reps||'?')+'次'+(e.weight?('x'+e.weight+'kg'):'');
+        ? e.name+' '+(e.detail.length)+'组'+(e.detail.map(d=> d.rweight!=null&&d.rweight>0 ? d.rweight+d.runit : (d.weight>0?d.weight+'kg':null)).filter(v=>v!=null).join('/'))+(' '+(e.detail.map(d=>d.reps).join('/'))+'次')
+        : e.name+' '+(e.sets||'?')+'组x'+(e.reps||'?')+'次'+(e.wraw!=null&&e.wraw>0?('x'+e.wraw+e.wunit):(e.weight?('x'+e.weight+'kg'):''));
       document.getElementById('exInput').value=txt;
       profile().customEx[k].splice(i,1);save();renderCustomEx();renderExLib();renderExParts();renderCalorieSummary();
       document.getElementById('exInput').focus();
@@ -4704,7 +4713,7 @@ const name=(''+o.name).trim()||p.name||raw.trim();
 const sets=o.sets||p.sets, reps=o.reps||p.reps, weight=(o.weight||p.weight||0);
 const cal=estExCal(sets,reps,weight,name);
 const part=partKeyFromName(o.part)||classifyPart(name);
-addCustomEx(name,sets,reps,weight,null,o.note,'ai',part,p.detail);
+addCustomEx(name,sets,reps,weight,null,o.note,'ai',part,p.detail,p.wunit,p.wraw);
 const inp=document.getElementById(inputId);if(inp)inp.value='';
 showFoodHint('✅ AI：'+name+' ≈ '+cal+'kcal（MET 本地估算·'+sets+'组×'+reps+'次'+(weight?('·'+weight+'kg'):'')+'）已记录');
   }catch(e){
@@ -4714,7 +4723,7 @@ showFoodHint('✅ AI：'+name+' ≈ '+cal+'kcal（MET 本地估算·'+sets+'组�
 document.getElementById('exAdd').onclick=()=>{
   const raw=document.getElementById('exInput').value.trim(); if(!raw)return;
   const p=parseExPerf(raw);
-  addCustomEx(p.name,p.sets,p.reps,p.weight,null,null,false,undefined,p.detail);
+  addCustomEx(p.name,p.sets,p.reps,p.weight,null,null,false,undefined,p.detail,p.wunit,p.wraw);
   const cal=estExCal(p.sets,p.reps,p.weight,p.name);
   document.getElementById('exInput').value='';
   showFoodHint('➕ 已记录「'+p.name+'」≈ '+cal+'kcal（本地估算；填 Key 撳🔍AI 更准）');

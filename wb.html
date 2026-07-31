@@ -1707,7 +1707,7 @@ const MENUS = {
 const KEY='fitness_workbench_v2';
 let state=load();
 // 强制缓存更新：版本变化时清除所有 sw 缓存并硬刷新
-const APP_VER='54';
+const APP_VER='55';
 if(localStorage.getItem('app_ver')!==APP_VER){
   localStorage.setItem('app_ver',APP_VER);
   if('caches' in window)caches.keys().then(n=>{n.forEach(c=>{if(c.includes('fitness-workbench'))caches.delete(c);});}).then(()=>location.reload(true));
@@ -4264,7 +4264,7 @@ const FLAVORED_DRINKS=[
   {n:'百香果美式',cal0:60,carb0:14,cal1:120,carb1:28},
   {n:'柠C美式',cal0:55,carb0:13,cal1:115,carb1:26},
   {n:'橘金气泡美式',cal0:55,carb0:13,cal1:115,carb1:26},
-  {n:'橙C美式',cal0:55,carb0:13,cal1:115,carb1:26},
+  {n:'橙C美式',cal0:118,carb0:26,cal1:196,carb1:46},
   {n:'葡萄美式',cal0:58,carb0:14,cal1:118,carb1:27},
   {n:'凤梨美式',cal0:58,carb0:14,cal1:118,carb1:27},
   {n:'西柚美式',cal0:52,carb0:12,cal1:110,carb1:25},

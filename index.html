@@ -1707,7 +1707,7 @@ const MENUS = {
 const KEY='fitness_workbench_v2';
 let state=load();
 // 强制缓存更新：版本变化时清除所有 sw 缓存并硬刷新
-const APP_VER='59';
+const APP_VER='60';
 if(localStorage.getItem('app_ver')!==APP_VER){
   localStorage.setItem('app_ver',APP_VER);
   if('caches' in window)caches.keys().then(n=>{n.forEach(c=>{if(c.includes('fitness-workbench'))caches.delete(c);});}).then(()=>location.reload(true));
@@ -3382,6 +3382,16 @@ function matchFoodCal(text){
   if(cookedWithOil && totalCal>0 && parts.length>=2){ totalCal+=90; if(matchedNames.length)matchedNames.push('烹调用油'); }
   return {cal:totalCal,carb:totalCarb,matched:matchedNames.join('、'),fuzzy,parts};
 }
+/* v60：三餐「添加」按钮也走品牌风味饮精准匹配（resolveSugarDrink），
+   避免品牌饮品/风味饮经 matchFoodCal 落 0 卡（此前只有「AI查」按钮才走这条路）。
+   规则：matchFoodCal 有把握命中(非 fuzzy 且识别到食物)→直用；否则让品牌饮表兜底；仍识别不出→保留 0 卡+未识别提示 */
+function resolveMealInfo(name){
+  const info=matchFoodCal(name);
+  if(!info.fuzzy && info.parts.length) return info;     // 本地库有把握命中（含克数/份量）→ 直用
+  const fd=resolveSugarDrink(name);                     // 否则让品牌风味饮表兜底（瑞幸/库迪/喜茶/奈雪/霸王茶姬/古茗…）
+  if(fd) return {cal:fd.cal,carb:fd.carb,matched:fd.name,fuzzy:false,parts:[{name:fd.name,qty:'',cal:fd.cal,carb:fd.carb}]};
+  return info;                                          // 仍识别不出 → 保留 0 卡 + 未识别提示
+}
 let _hintTimer;
 function showFoodHint(msg){
   let el=document.getElementById('foodHint');
@@ -4171,7 +4181,7 @@ toggleCardioIncline();
 document.getElementById('breakfastAdd').onclick=()=>{
   const name=document.getElementById('breakfastInput').value.trim();
   if(!name)return;
-  const info=matchFoodCal(name);
+  const info=resolveMealInfo(name);
   if(!profile().breakfast)profile().breakfast={};
   if(!profile().breakfast[recKey()])profile().breakfast[recKey()]=[];
   profile().breakfast[recKey()].push({name,cal:info.cal,carb:info.carb,matched:info.matched||''});
@@ -4185,7 +4195,7 @@ document.getElementById('breakfastAdd').onclick=()=>{
 document.getElementById('lunchAdd').onclick=()=>{
   const name=document.getElementById('lunchInput').value.trim();
   if(!name)return;
-  const info=matchFoodCal(name);
+  const info=resolveMealInfo(name);
   if(!profile().lunch)profile().lunch={};
   if(!profile().lunch[recKey()])profile().lunch[recKey()]=[];
   profile().lunch[recKey()].push({name,cal:info.cal,carb:info.carb,matched:info.matched||''});
@@ -4198,7 +4208,7 @@ document.getElementById('lunchAdd').onclick=()=>{
 document.getElementById('dinnerAdd').onclick=()=>{
   const name=document.getElementById('dinnerInput').value.trim();
   if(!name)return;
-  const info=matchFoodCal(name);
+  const info=resolveMealInfo(name);
   if(!profile().dinner)profile().dinner={};
   if(!profile().dinner[recKey()])profile().dinner[recKey()]=[];
   profile().dinner[recKey()].push({name,cal:info.cal,carb:info.carb,matched:info.matched||''});

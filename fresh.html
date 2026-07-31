@@ -1707,7 +1707,7 @@ const MENUS = {
 const KEY='fitness_workbench_v2';
 let state=load();
 // 强制缓存更新：版本变化时清除所有 sw 缓存并硬刷新
-const APP_VER='58';
+const APP_VER='59';
 if(localStorage.getItem('app_ver')!==APP_VER){
   localStorage.setItem('app_ver',APP_VER);
   if('caches' in window)caches.keys().then(n=>{n.forEach(c=>{if(c.includes('fitness-workbench'))caches.delete(c);});}).then(()=>location.reload(true));
@@ -3209,6 +3209,8 @@ const FOOD_ALIAS={
   '青瓜':'黄瓜','翠肉瓜':'节瓜','凉瓜':'苦瓜','天津白':'白菜',
   /* 肉品·粤语/俗名 */
   '豬肉':'猪肉','豬扒':'猪扒','豬排':'猪扒','五花腩':'五花肉',
+  /* 鱼类·常见中文鱼名（FOOD_DB 未列具体鱼种，按白肉鱼类近似营养走鱼肉基准） */
+  '鲈鱼':'鱼肉','罗非鱼':'鱼肉','草鱼':'鱼肉','鲫鱼':'鱼肉','鳜鱼':'鱼肉','带鱼':'带鱼','鱿鱼':'鱿鱼',
   '雞肉':'鸡肉','雞胸':'鸡胸肉','雞腿':'鸡腿肉','雞髀':'鸡腿肉','雞翼':'鸡翅','雞中翼':'鸡翅',
   '牛柳':'牛肉','牛脷':'牛肉','肉碎':'猪肉','猪颈肉':'猪肉','烧肉':'猪肉',
   '肉':'猪肉','鱼':'鱼肉',
@@ -3319,6 +3321,8 @@ function matchFoodCal(text){
     let mw=null;
     const mm=text.slice(j).match(_MW_RE);
     if(mm){mw=mm[0];j+=mm[0].length;}
+    // 容许量词与食物名之间的空白/标点（"10g 米饭" / "2 个 鸡蛋" / "150g 鲈鱼"），否则 grams 会被丢弃退回 100g 默认
+    while(j<text.length && /[\s、，,;；:：.。·]/.test(text[j])) j++;
     // 3) 从该位置贪心匹配最长食物名（含方言别名）
     let best=null;
     for(const t of terms){ if(t.term.length && text.startsWith(t.term,j)){best=t;break;} }
@@ -4542,6 +4546,7 @@ async function aiLookupFood(raw,kind,inputId){
 - 奶茶/拿铁/果茶（连锁）：按该品牌中杯标准糖的标准配方
 - 坚果：1 份 ≈ 30g
 - 肉/水产：1 份 ≈ 100g 生重
+- 【硬规则】用户已显式标克数/毫升（如「150g 鲈鱼」「10g 米饭」「半斤红薯」「2 个鸡蛋」），必须**严格按该克数/件数**算，不得退回默认份量
 
 【糖度与配方】
 - 咖啡/茶/气泡水（纯味：美式/黑咖啡/气泡水/乌龙/绿茶等）：用户没写按「标准糖」算；「少少甜/微糖/半糖/七分糖」按标准糖的 50% 折算糖浆热量；「无糖/不加糖/不另外加糖」按 0 算糖（纯味饮本身无糖）

@@ -1707,7 +1707,7 @@ const MENUS = {
 const KEY='fitness_workbench_v2';
 let state=load();
 // 强制缓存更新：版本变化时清除所有 sw 缓存并硬刷新
-const APP_VER='55';
+const APP_VER='56';
 if(localStorage.getItem('app_ver')!==APP_VER){
   localStorage.setItem('app_ver',APP_VER);
   if('caches' in window)caches.keys().then(n=>{n.forEach(c=>{if(c.includes('fitness-workbench'))caches.delete(c);});}).then(()=>location.reload(true));
@@ -4260,21 +4260,33 @@ function registerMeal(kind,name,cal,carb,inputId){
    糖度系数 f：不另外加糖=0 | 微甜/少少甜/三分糖=0.25 | 半糖/少甜/五分糖/少糖=0.5 | 七分糖=0.7 | 标准糖/全糖(默认)=1
    杯型：小杯0.8 | 中杯1 | 大杯1.2 | 超大杯1.4 */
 const FLAVORED_DRINKS=[
-  /* 果味/风味美式（无奶，果浆基底自带糖，不另外加糖≠0糖） */
-  {n:'百香果美式',cal0:60,carb0:14,cal1:120,carb1:28},
-  {n:'柠C美式',cal0:55,carb0:13,cal1:115,carb1:26},
-  {n:'橘金气泡美式',cal0:55,carb0:13,cal1:115,carb1:26},
-  {n:'橙C美式',cal0:118,carb0:26,cal1:196,carb1:46},
-  {n:'葡萄美式',cal0:58,carb0:14,cal1:118,carb1:27},
+  /* 果味/风味美式（无奶，果浆基底自带糖，不另外加糖≠0糖）
+     数值锚定瑞幸官网 lkcoffee.com 产品页（大杯/冰/不另外加糖）；实测/估算项见行尾注释
+     顺序按「名长优先」排，避免「葡萄冰萃美式」误中「葡萄美式」等子串短路 */
+  {n:'小青桔C美式',cal0:115,carb0:26,cal1:175,carb1:41},   // 官网115
+  {n:'缤纷C美式',cal0:100,carb0:22,cal1:160,carb1:37},     // 官网100
+  {n:'苹果C美式',cal0:133,carb0:30,cal1:193,carb1:45},     // 官网133
+  {n:'橙C美式',cal0:118,carb0:26,cal1:196,carb1:46},       // 官网128，锚定用户杯上118
+  {n:'柚C美式',cal0:137,carb0:30,cal1:197,carb1:45},       // 官网137
+  {n:'百香果美式',cal0:124,carb0:28,cal1:184,carb1:43},    // 实测124(大杯/冰/不另加糖)
+  {n:'鲜切柠C美式',cal0:77,carb0:17,cal1:137,carb1:32},    // =柠C气泡美式（鲜果版）官网77
+  {n:'柠C气泡美式',cal0:77,carb0:17,cal1:137,carb1:32},     // 官网(鲜果版)77
+  {n:'柠C美式',cal0:90,carb0:20,cal1:150,carb1:35},        // 实测83-98（须排在鲜切/气泡之后，避免子串误中）
+  {n:'葡萄冰萃美式',cal0:110,carb0:24,cal1:170,carb1:39},  // 估算(百度知道中杯带浆180)
+  {n:'葡萄美式',cal0:58,carb0:14,cal1:118,carb1:27},       // 旧值(待核实)
   {n:'凤梨美式',cal0:58,carb0:14,cal1:118,carb1:27},
+  {n:'橘金气泡美式',cal0:55,carb0:13,cal1:115,carb1:26},
   {n:'西柚美式',cal0:52,carb0:12,cal1:110,carb1:25},
   {n:'蓝莓美式',cal0:58,carb0:14,cal1:118,carb1:27},
   {n:'芒果美式',cal0:60,carb0:15,cal1:120,carb1:28},
   {n:'柚见美式',cal0:55,carb0:13,cal1:115,carb1:26},
   {n:'薄荷美式',cal0:50,carb0:12,cal1:100,carb1:22},
-  {n:'椰青美式',cal0:55,carb0:13,cal1:115,carb1:26},
+  {n:'椰青冰萃美式',cal0:90,carb0:20,cal1:150,carb1:35},   // 实测80-100
+  {n:'椰青美式',cal0:55,carb0:13,cal1:115,carb1:26},       // 旧值(待核实)
+  {n:'苦瓜轻体美式',cal0:125,carb0:28,cal1:185,carb1:43},  // 抖音大杯/不另加糖125
+  {n:'茉莉美式',cal0:52,carb0:12,cal1:112,carb1:27},       // 估算(减脂清肠实测无糖52)
   /* 风味拿铁（含奶基底） */
-  {n:'生椰拿铁',cal0:110,carb0:9,cal1:140,carb1:13},
+  {n:'生椰拿铁',cal0:179,carb0:13,cal1:239,carb1:28},   // 官网179(大杯/冰/不另加糖)
   {n:'丝绒拿铁',cal0:120,carb0:10,cal1:175,carb1:21},
   {n:'抹茶拿铁',cal0:130,carb0:12,cal1:190,carb1:24},
   {n:'茉莉花香拿铁',cal0:120,carb0:10,cal1:170,carb1:20},

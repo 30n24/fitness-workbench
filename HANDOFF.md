@@ -1,7 +1,7 @@
 # 健身计划工作台（fitness-workbench）续接说明
 
 > 用途：新开任务会话时，把本文件内容贴给 AI，它即可无缝衔接，不必重新了解项目。
-> 最后更新：v55（2026-07-31）。代码托管：GitHub Pages `30n24/fitness-workbench`。
+> 最后更新：v56（2026-07-31）。代码托管：GitHub Pages `30n24/fitness-workbench`。
 
 ---
 
@@ -95,6 +95,7 @@
 | v53 | 新增「重新显示」：最近食物卡底部加「已隐藏 N 项 ↺」切换，展开后列出 `profile().hiddenFoods` 中每一项（class `hidden-item`，默认 `display:none`，`show-hidden` 时显示），点该行即把该食物从 `hiddenFoods` 移除并重渲——还原到建议列表。配套 CSS 已在 748-750 行(`hidden-item`/`show-hidden`/`cf-show`)。test_recentfood 增至 15/15（含重新显示用例）。**注意**：`renderRecentFood` 内 `hidden` 变量已在函数顶部(3657 行)声明，新增区块复用、勿重复 `const` 声明（否则整页 SyntaxError） |
 | v54 | 修「瑞幸橙c美式不另外加糖」点 AI 冇反应的真 bug：(1) `resolveSugarDrink` generic 兜底分支引用未声明变量 `qm` → ReferenceError，promise reject 无 catch → 用户完全冇反馈（4348 行已删死代码）；(2) FLAVORED_DRINKS 子串匹配原大小写+空白敏感（表 `'橙C美式'` 匹配唔到 `'橙c美式'`/`'橙 c 美式'`），改用 `rawNorm=raw.replace(/\s+/g,'').toLowerCase()` 与 `d.n.toLowerCase()` 容错比较；糖度/杯型/品牌识别不变。新增 test_sugardrink.js 25/25（覆盖 bug case + 空格/大小写变体 + 百香果/生椰/大杯半糖/柠C空格变体 + 奇异果 generic 兜底不再抛错 + 纯美式无风味返回 null） |
 | v55 | 校正「瑞幸橙C美式」营养数据（用户报 app 显示 55kcal 但杯上标签 118kcal，偏差过大）：根因 `FLAVORED_DRINKS` 表把 `橙C美式` 当通用「美式+果浆」值（`cal0:55/carb0:13`），但 NFC橙汁本身带真糖（≈45kcal/100ml），不另外加糖实测 118-128kcal。已按品牌标签校正：`cal0 55→118, carb0 13→26`（不另外加糖）、`cal1 115→196, carb1 26→46`（标准糖）；其余果汁美式（葡萄/凤梨/蓝莓等）暂未动（仅橙C被报、且需逐个核实）。test_sugardrink 增至 29/29（橙C 不另外加糖=118/26、标准糖=196/46、半糖=157/36、大杯=142/31）。注意：已记录的历史条目不会自动变，用户需 ✎ 修正或删咗重加；`profile().foods` 唔受此路径污染（resolveSugarDrink 唔写自定义库） |
+| v56 | 批量校准 13 款瑞幸风味饮（用户点名：柚C/百香果/生椰拿铁/椰青冰萃/苦瓜轻体/茉莉/苹果C/柠C/柠C气泡/葡萄冰萃/小青桔C/缤纷C/鲜切柠C 美式）。数据锚定瑞幸官网 `lkcoffee.com` 产品页（大杯/冰/不另外加糖）为主、实测/抖音为补：`生椰拿铁 110→179kcal`(被低估69，官网179)、`百香果美式→124/28`(实测)、`柠C美式→90/20`(实测83-98)、`鲜切柠C美式`/`柠C气泡美式→77/17`(官网鲜果版)、`葡萄冰萃美式→110/24`、`椰青冰萃美式→90/20`、`苦瓜轻体美式→125/28`(抖音)、`茉莉美式→52/12`、`柚C美式→137/30`、`苹果C美式→133/30`、`小青桔C美式→115/26`、`缤纷C美式→100/22`。关键修法：表按「名长优先」排序，避免 `鲜切柠C美式`/`柠C气泡美式` 被更短的 `柠C美式` 子串误中（已加专项断言，v56 测试 44/44）。喜茶/库迪/奈雪/霸王茶姬/古茗等官网数据用户亦问及，但 13 款全属瑞幸，故先做瑞幸，其余品牌待其点名再做 |
 
 ---
 
@@ -131,7 +132,7 @@ NODE_PATH=/workspace/deploy/node_modules node 你的测试.js
 > 我在做 `/workspace/deploy` 里的单文件 PWA 健身工作台 `健身计划工作台`（GitHub Pages `30n24/fitness-workbench`）。
 > 主文件 `index.html`，改完要同步 `fresh.html`/`wb.html`、`sw.js`（CACHE_NAME）并把 `index.html` 内 `APP_VER` 一起 +1 后 `git push`。
 > 设计铁律：饮食登记餐名=用户输入原文（忠实登记），热量/碳水按量词精确算；品牌风味饮料用甜度插值（FLAVORED_DRINKS 锚点 + 通用兜底）；三级查找 FOOD_DB→USDA→AI。
-> 已做：v33 碳水统计（每餐+全天+✎碳水修正）、v34 去毛玻璃降发热、v35 顶部「今日碳水」实时读数、v36→v51 动作库/食物库超长自动折叠（现折叠阈值 6 项，点「展开全部 N」展开）；v51 饮食页「我的食物库」卡改为「最近食物」（从早/午/晚/外食历史派生、去重、折叠 6，点整行快速填入，✕ 仅隐藏不删历史）；v52 ✕ 改为仅入 `profile().hiddenFoods` 隐藏名单；v53 卡底「已隐藏 N 项 ↺」可重新显示；v54 修 `resolveSugarDrink` 冇反应真 bug（generic 兜底 qm 死代码 ReferenceError + FLAVORED_DRINKS 子串匹配加去空白大小写容错）；v55 校正「橙C美式」营养（NFC橙汁带真糖，不另外加糖 55→118kcal、碳水 13→26g，锚定品牌标签）。
+> 已做：v33 碳水统计（每餐+全天+✎碳水修正）、v34 去毛玻璃降发热、v35 顶部「今日碳水」实时读数、v36→v51 动作库/食物库超长自动折叠（现折叠阈值 6 项，点「展开全部 N」展开）；v51 饮食页「我的食物库」卡改为「最近食物」（从早/午/晚/外食历史派生、去重、折叠 6，点整行快速填入，✕ 仅隐藏不删历史）；v52 ✕ 改为仅入 `profile().hiddenFoods` 隐藏名单；v53 卡底「已隐藏 N 项 ↺」可重新显示；v54 修 `resolveSugarDrink` 冇反应真 bug（generic 兜底 qm 死代码 ReferenceError + FLAVORED_DRINKS 子串匹配加去空白大小写容错）；v55 校正「橙C美式」营养（NFC橙汁带真糖，不另外加糖 55→118kcal、碳水 13→26g，锚定品牌标签）；v56 批量校准 13 款瑞幸风味饮（生椰拿铁 110→179kcal、百香果/柠C/鲜切柠C/柠C气泡/葡萄冰萃/椰青冰萃/苦瓜轻体/茉莉/柚C/苹果C/小青桔C/缤纷C 美式，锚定瑞幸官网+实测），FLAVORED_DRINKS 改「名长优先」排序避免子串误中。
 > 测试用 Playwright 起 `python3.11 -m http.server 8123`，屏蔽外网接口走本地链路。
 > 当前诉求背景：碳循环控制，每日碳水统计最重要。请先读 `HANDOFF.md` 与 `index.html` 相关函数再动手。
 
@@ -160,6 +161,6 @@ NODE_PATH=/workspace/deploy/node_modules node 你的测试.js
 继续做健身工作台 PWA（/workspace/deploy，GitHub Pages 30n24/fitness-workbench）。
 主文件 index.html；改完要同步 fresh.html/wb.html、sw.js(改 CACHE_NAME) 并把 index.html 内 APP_VER 一起+1 后 git push。
 设计铁律：饮食登记餐名=用户输入原文（忠实登记），热量/碳水按量词精确算；品牌风味饮料用甜度插值（FLAVORED_DRINKS 锚点+通用兜底）；三级查找 FOOD_DB→USDA→AI。
-已做：v33 碳水统计（每餐+全天+✎碳水修正）、v34 去毛玻璃降发热、v35 顶部「今日碳水」实时读数、v36→v51 动作库/食物库超长自动折叠(现折叠阈值 6 项点击展开)+修复进训练页动作库空白；v51 饮食页「我的食物库」卡改为「最近食物」(从早/午/晚/外食历史派生去重、折叠6、点整行快速填入、✕仅隐藏不删历史)；v52 ✕改为仅入 hiddenFoods 隐藏名单；v53 卡底「已隐藏 N 项 ↺」可重新显示；v54 修 resolveSugarDrink 冇反应真 bug（generic 兜底 qm 死代码 ReferenceError + FLAVORED_DRINKS 匹配加去空白大小写容错）；v55 校正「橙C美式」营养（NFC橙汁带真糖，不另外加糖 55→118kcal、碳水 13→26g，锚定品牌标签）。
+已做：v33 碳水统计（每餐+全天+✎碳水修正）、v34 去毛玻璃降发热、v35 顶部「今日碳水」实时读数、v36→v51 动作库/食物库超长自动折叠(现折叠阈值 6 项点击展开)+修复进训练页动作库空白；v51 饮食页「我的食物库」卡改为「最近食物」(从早/午/晚/外食历史派生去重、折叠6、点整行快速填入、✕仅隐藏不删历史)；v52 ✕改为仅入 hiddenFoods 隐藏名单；v53 卡底「已隐藏 N 项 ↺」可重新显示；v54 修 resolveSugarDrink 冇反应真 bug（generic 兜底 qm 死代码 ReferenceError + FLAVORED_DRINKS 匹配加去空白大小写容错）；v55 校正「橙C美式」营养（NFC橙汁带真糖，不另外加糖 55→118kcal、碳水 13→26g，锚定品牌标签）；v56 批量校准 13 款瑞幸风味饮（生椰拿铁 110→179kcal、百香果/柠C/鲜切柠C/柠C气泡/葡萄冰萃/椰青冰萃/苦瓜轻体/茉莉/柚C/苹果C/小青桔C/缤纷C 美式，锚定瑞幸官网+实测），FLAVORED_DRINKS 改「名长优先」排序避免子串误中。
 先 git log 看最新改动并读 HANDOFF.md（若存在），动手前先读 index.html 相关函数。当前诉求：碳循环控制，每日碳水统计最重要。
 ```

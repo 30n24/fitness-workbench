@@ -1707,7 +1707,7 @@ const MENUS = {
 const KEY='fitness_workbench_v2';
 let state=load();
 // 强制缓存更新：版本变化时清除所有 sw 缓存并硬刷新
-const APP_VER='53';
+const APP_VER='54';
 if(localStorage.getItem('app_ver')!==APP_VER){
   localStorage.setItem('app_ver',APP_VER);
   if('caches' in window)caches.keys().then(n=>{n.forEach(c=>{if(c.includes('fitness-workbench'))caches.delete(c);});}).then(()=>location.reload(true));
@@ -4324,9 +4324,10 @@ function resolveSugarDrink(raw){
   // 4) 品牌（仅用于命名）
   let brand='';
   for(const b of SUGAR_BRANDS){ if(raw.includes(b)){brand=b;break;} }
-  // 5) 基底匹配（子串，品牌无关）
+  // 5) 基底匹配（子串，品牌无关；容错去空白+大小写：原话可能有"橙 c 美式""橙c美式"等写法）
+  const rawNorm=raw.replace(/\s+/g,'').toLowerCase();
   for(const d of FLAVORED_DRINKS){
-    if(raw.includes(d.n)){
+    if(rawNorm.includes(d.n.toLowerCase())){
       const cal=Math.round((d.cal0+(d.cal1-d.cal0)*f)*size)*qty;
       const carb=Math.round((d.carb0+(d.carb1-d.carb0)*f)*size)*qty;
       const dg=f===0?'不另外加糖':(degree!=='标准糖'?degree:'');
@@ -4345,7 +4346,7 @@ function resolveSugarDrink(raw){
   if(gd){
     const cal=Math.round((gd.cal0+(gd.cal1-gd.cal0)*f)*size)*qty;
     const carb=Math.round((gd.carb0+(gd.carb1-gd.carb0)*f)*size)*qty;
-    let name=raw; if(qm&&qm[0]) name=raw.slice(qm[0].length).trim();
+    let name=raw;
     return {name,cal,carb,degree,qty,sizeNote,generic:true};
   }
   return null;

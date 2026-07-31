@@ -1,7 +1,7 @@
 # 健身计划工作台（fitness-workbench）续接说明
 
 > 用途：新开任务会话时，把本文件内容贴给 AI，它即可无缝衔接，不必重新了解项目。
-> 最后更新：v53（2026-07-31）。代码托管：GitHub Pages `30n24/fitness-workbench`。
+> 最后更新：v54（2026-07-31）。代码托管：GitHub Pages `30n24/fitness-workbench`。
 
 ---
 
@@ -20,7 +20,7 @@
 
 | 文件 | 作用 |
 |------|------|
-| `index.html` | **主程序**，单文件含全部 HTML/CSS/JS，当前 **5020 行**。改功能只改这里。 |
+| `index.html` | **主程序**，单文件含全部 HTML/CSS/JS，当前 **5021 行**。改功能只改这里。 |
 | `fresh.html` / `wb.html` | `index.html` 的同步副本。**每次改完 index.html 必须 `cp index.html fresh.html && cp index.html wb.html`**。 |
 | `sw.js` | Service Worker。`CACHE_NAME` 需与 `index.html` 里的 `APP_VER` 同步递增。 |
 | `manifest.json` / 图标 | PWA 安装资源，一般不动。 |
@@ -93,6 +93,7 @@
 | v51 | UI 整理：(1) 动作库(`renderExLib`)与饮食食物卡折叠阈值 8→6，超 6 项出「展开全部 N ▾」切换；(2) 饮食页「我的食物库」卡改为「最近食物」——从 早餐/午餐/晚餐/外食 历史派生、去重（`renderRecentFood`，取代原 `renderCustomFood`）；(3) 最近食物卡：点整行快速填入对应餐输入框、✕ 删除该食物「最近一条」历史记录(带 confirm)，折叠 6 项；(4) 保留「+ 自定义食物」录入（仍入匹配库 `profile().foods`）；(5) 删除底部 `foodQuick` 区块（HTML div / `renderDiet` 调用 / `renderFoodQuick` 函数），其餐输入框焦点跟踪抽成独立初始化供新卡用；新增 test_recentfood(9/9：派生顺序/去重/折叠/删除) |
 | v52 | 修正「最近食物」✕ 语义：按用户要求，✕ 改为**仅从建议列表隐藏**（`profile().hiddenFoods` 名单），唔再删历史记录、唔使确认、方便直接清理建议；点整行快速填入不变；移除破坏性 `deleteRecentFood`。折叠仍 6 项。test_recentfood 改验隐藏行为(11/11) |
 | v53 | 新增「重新显示」：最近食物卡底部加「已隐藏 N 项 ↺」切换，展开后列出 `profile().hiddenFoods` 中每一项（class `hidden-item`，默认 `display:none`，`show-hidden` 时显示），点该行即把该食物从 `hiddenFoods` 移除并重渲——还原到建议列表。配套 CSS 已在 748-750 行(`hidden-item`/`show-hidden`/`cf-show`)。test_recentfood 增至 15/15（含重新显示用例）。**注意**：`renderRecentFood` 内 `hidden` 变量已在函数顶部(3657 行)声明，新增区块复用、勿重复 `const` 声明（否则整页 SyntaxError） |
+| v54 | 修「瑞幸橙c美式不另外加糖」点 AI 冇反应的真 bug：(1) `resolveSugarDrink` generic 兜底分支引用未声明变量 `qm` → ReferenceError，promise reject 无 catch → 用户完全冇反馈（4348 行已删死代码）；(2) FLAVORED_DRINKS 子串匹配原大小写+空白敏感（表 `'橙C美式'` 匹配唔到 `'橙c美式'`/`'橙 c 美式'`），改用 `rawNorm=raw.replace(/\s+/g,'').toLowerCase()` 与 `d.n.toLowerCase()` 容错比较；糖度/杯型/品牌识别不变。新增 test_sugardrink.js 25/25（覆盖 bug case + 空格/大小写变体 + 百香果/生椰/大杯半糖/柠C空格变体 + 奇异果 generic 兜底不再抛错 + 纯美式无风味返回 null） |
 
 ---
 
@@ -129,7 +130,7 @@ NODE_PATH=/workspace/deploy/node_modules node 你的测试.js
 > 我在做 `/workspace/deploy` 里的单文件 PWA 健身工作台 `健身计划工作台`（GitHub Pages `30n24/fitness-workbench`）。
 > 主文件 `index.html`，改完要同步 `fresh.html`/`wb.html`、`sw.js`（CACHE_NAME）并把 `index.html` 内 `APP_VER` 一起 +1 后 `git push`。
 > 设计铁律：饮食登记餐名=用户输入原文（忠实登记），热量/碳水按量词精确算；品牌风味饮料用甜度插值（FLAVORED_DRINKS 锚点 + 通用兜底）；三级查找 FOOD_DB→USDA→AI。
-> 已做：v33 碳水统计（每餐+全天+✎碳水修正）、v34 去毛玻璃降发热、v35 顶部「今日碳水」实时读数、v36→v51 动作库/食物库超长自动折叠（现折叠阈值 6 项，点「展开全部 N」展开）；v51 饮食页「我的食物库」卡改为「最近食物」（从早/午/晚/外食历史派生、去重、折叠 6，点整行快速填入，✕ 仅隐藏不删历史）；v52 ✕ 改为仅入 `profile().hiddenFoods` 隐藏名单；v53 卡底「已隐藏 N 项 ↺」可重新显示。
+> 已做：v33 碳水统计（每餐+全天+✎碳水修正）、v34 去毛玻璃降发热、v35 顶部「今日碳水」实时读数、v36→v51 动作库/食物库超长自动折叠（现折叠阈值 6 项，点「展开全部 N」展开）；v51 饮食页「我的食物库」卡改为「最近食物」（从早/午/晚/外食历史派生、去重、折叠 6，点整行快速填入，✕ 仅隐藏不删历史）；v52 ✕ 改为仅入 `profile().hiddenFoods` 隐藏名单；v53 卡底「已隐藏 N 项 ↺」可重新显示；v54 修 `resolveSugarDrink` 冇反应真 bug（generic 兜底 qm 死代码 ReferenceError + FLAVORED_DRINKS 子串匹配加去空白大小写容错）。
 > 测试用 Playwright 起 `python3.11 -m http.server 8123`，屏蔽外网接口走本地链路。
 > 当前诉求背景：碳循环控制，每日碳水统计最重要。请先读 `HANDOFF.md` 与 `index.html` 相关函数再动手。
 
@@ -158,6 +159,6 @@ NODE_PATH=/workspace/deploy/node_modules node 你的测试.js
 继续做健身工作台 PWA（/workspace/deploy，GitHub Pages 30n24/fitness-workbench）。
 主文件 index.html；改完要同步 fresh.html/wb.html、sw.js(改 CACHE_NAME) 并把 index.html 内 APP_VER 一起+1 后 git push。
 设计铁律：饮食登记餐名=用户输入原文（忠实登记），热量/碳水按量词精确算；品牌风味饮料用甜度插值（FLAVORED_DRINKS 锚点+通用兜底）；三级查找 FOOD_DB→USDA→AI。
-已做：v33 碳水统计（每餐+全天+✎碳水修正）、v34 去毛玻璃降发热、v35 顶部「今日碳水」实时读数、v36→v51 动作库/食物库超长自动折叠(现折叠阈值 6 项点击展开)+修复进训练页动作库空白；v51 饮食页「我的食物库」卡改为「最近食物」(从早/午/晚/外食历史派生去重、折叠6、点整行快速填入、✕仅隐藏不删历史)；v52 ✕改为仅入 hiddenFoods 隐藏名单；v53 卡底「已隐藏 N 项 ↺」可重新显示。
+已做：v33 碳水统计（每餐+全天+✎碳水修正）、v34 去毛玻璃降发热、v35 顶部「今日碳水」实时读数、v36→v51 动作库/食物库超长自动折叠(现折叠阈值 6 项点击展开)+修复进训练页动作库空白；v51 饮食页「我的食物库」卡改为「最近食物」(从早/午/晚/外食历史派生去重、折叠6、点整行快速填入、✕仅隐藏不删历史)；v52 ✕改为仅入 hiddenFoods 隐藏名单；v53 卡底「已隐藏 N 项 ↺」可重新显示；v54 修 resolveSugarDrink 冇反应真 bug（generic 兜底 qm 死代码 ReferenceError + FLAVORED_DRINKS 匹配加去空白大小写容错）。
 先 git log 看最新改动并读 HANDOFF.md（若存在），动手前先读 index.html 相关函数。当前诉求：碳循环控制，每日碳水统计最重要。
 ```

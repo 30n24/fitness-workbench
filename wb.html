@@ -1707,7 +1707,7 @@ const MENUS = {
 const KEY='fitness_workbench_v2';
 let state=load();
 // 强制缓存更新：版本变化时清除所有 sw 缓存并硬刷新
-const APP_VER='57';
+const APP_VER='58';
 if(localStorage.getItem('app_ver')!==APP_VER){
   localStorage.setItem('app_ver',APP_VER);
   if('caches' in window)caches.keys().then(n=>{n.forEach(c=>{if(c.includes('fitness-workbench'))caches.delete(c);});}).then(()=>location.reload(true));
@@ -4311,6 +4311,33 @@ const FLAVORED_DRINKS=[
   {n:'椰青冰翠',cal0:70,carb0:10,cal1:130,carb1:24},
   {n:'椰青',cal0:70,carb0:10,cal1:130,carb1:24}
 ];
+/* 品牌专属（品牌前缀，longest-match 优先于上方通用条目；cal0/carb0=不另外加糖，cal1/carb1=标准糖）
+   数据来源标注：霸王茶姬=官方健康计算器API(qmproductcomput.bwcj.com，大杯)；其余=社区测评估算(官方未公开逐杯)
+   注：原叶鲜奶茶「不另外加糖」仍含鲜奶乳糖；果茶「不另外加糖」仍含果肉天然糖，故碳水非0 */
+const BRAND_DRINKS=[
+  /* 霸王茶姬（官方·大杯） */
+  {n:'霸王茶姬伯牙绝弦',cal0:166,carb0:9,cal1:266,carb1:35},    // 官方(茉莉雪芽+鲜牛乳)
+  {n:'霸王茶姬花田乌龙',cal0:137,carb0:7,cal1:242,carb1:31},    // 官方(乌龙+鲜牛乳)
+  {n:'霸王茶姬青青糯山',cal0:167,carb0:8,cal1:274,carb1:36},    // 官方(糯香+鲜牛乳)
+  {n:'霸王茶姬寻香山茶',cal0:102,carb0:6,cal1:192,carb1:26},    // 官方(山茶花+鲜牛乳)
+  {n:'霸王茶姬万里木兰',cal0:180,carb0:10,cal1:289,carb1:37},   // 官方(木兰+鲜牛乳)
+  {n:'霸王茶姬醒时春山',cal0:162,carb0:7,cal1:279,carb1:35},    // 官方(栀子+鲜牛乳)
+  {n:'霸王茶姬去云南玫瑰普洱',cal0:110,carb0:10,cal1:180,carb1:25}, // 官方(中杯无糖110)；标准糖大杯估算
+  /* 喜茶（社区测评估算·大杯~500ml） */
+  {n:'喜茶多肉葡萄',cal0:95,carb0:22,cal1:250,carb1:50},        // 不另加糖95(第三方整理)；标准糖估
+  {n:'喜茶满杯红柚',cal0:90,carb0:22,cal1:230,carb1:48},        // 不另加糖估；标准糖估
+  {n:'喜茶喜柿多多',cal0:130,carb0:31,cal1:255,carb1:62},       // 官方(小程序:不另加糖130/31,少甜255/61.5)
+  /* 奈雪的茶（社区测评估算·大杯~500ml） */
+  {n:'奈雪霸气芝士草莓',cal0:250,carb0:30,cal1:480,carb1:55},   // 不另加糖去奶盖估；带奶盖标准糖估
+  {n:'奈雪杨枝甘露',cal0:200,carb0:32,cal1:300,carb1:50},       // 不另加糖估；标准糖估
+  {n:'奈雪霸气橙子',cal0:145,carb0:30,cal1:230,carb1:45},       // 不另加糖估；标准糖估
+  /* 古茗（社区测评估算·大杯~630ml） */
+  {n:'古茗超A芝士葡萄',cal0:250,carb0:35,cal1:334,carb1:55},    // 不另加糖估；标准糖334(toutiao测评)
+  /* 库迪咖啡（社区测评估算·大杯，配方近似瑞幸） */
+  {n:'库迪生椰拿铁',cal0:179,carb0:13,cal1:239,carb1:28}        // 同瑞幸生椰拿铁配方估
+];
+// 把品牌专属条目并入同一张表（BRAND_DRINKS 概念独立便于维护，匹配时统一 longest-match）
+for(const b of BRAND_DRINKS) FLAVORED_DRINKS.push(b);
 const SUGAR_BRANDS=['瑞幸','库迪','星巴克','幸运咖','蜜雪冰城','蜜雪','喜茶','奈雪','霸王茶姬','柠C','古茗','沪上阿姨','茶百道','CoCo','茶颜悦色','书亦','益禾堂','甜啦啦'];
 function resolveSugarDrink(raw){
   raw=(raw||'').trim(); if(!raw) return null;
@@ -4337,15 +4364,20 @@ function resolveSugarDrink(raw){
   let brand='';
   for(const b of SUGAR_BRANDS){ if(raw.includes(b)){brand=b;break;} }
   // 5) 基底匹配（子串，品牌无关；容错去空白+大小写：原话可能有"橙 c 美式""橙c美式"等写法）
+  //    取「最长命中」：品牌前缀条目(如「喜茶多肉葡萄」)天然比通用条目(「多肉葡萄」)长，优先胜出；
+  //    同时自动规避「鲜切柠C美式」被更短「柠C美式」子串误中等碰撞（无需手工排序）
   const rawNorm=raw.replace(/\s+/g,'').toLowerCase();
+  let best=null;
   for(const d of FLAVORED_DRINKS){
-    if(rawNorm.includes(d.n.toLowerCase())){
-      const cal=Math.round((d.cal0+(d.cal1-d.cal0)*f)*size)*qty;
-      const carb=Math.round((d.carb0+(d.carb1-d.carb0)*f)*size)*qty;
-      const dg=f===0?'不另外加糖':(degree!=='标准糖'?degree:'');
-      const name=(brand?brand:'')+d.n+dg+sizeNote;
-      return {name,cal,carb,degree,qty,sizeNote};
-    }
+    if(rawNorm.includes(d.n.toLowerCase())){ if(!best||d.n.length>best.n.length) best=d; }
+  }
+  if(best){
+    const d=best;
+    const cal=Math.round((d.cal0+(d.cal1-d.cal0)*f)*size)*qty;
+    const carb=Math.round((d.carb0+(d.carb1-d.carb0)*f)*size)*qty;
+    const dg=f===0?'不另外加糖':(degree!=='标准糖'?degree:'');
+    const name=(brand&&d.n.indexOf(brand)<0?brand+d.n:d.n)+dg+sizeNote;
+    return {name,cal,carb,degree,qty,sizeNote};
   }
   // 6) 通用兜底：任意「风味美式/风味拿铁/果茶」按品类锚点估算（覆盖瑞幸/库迪等未收录的海量 SKU）
   //    风味词命中才用，纯美式/纯拿铁/纯茶仍交本地库或 AI，避免误判

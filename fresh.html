@@ -1707,7 +1707,7 @@ const MENUS = {
 const KEY='fitness_workbench_v2';
 let state=load();
 // 强制缓存更新：版本变化时清除所有 sw 缓存并硬刷新
-const APP_VER='60';
+const APP_VER='61';
 if(localStorage.getItem('app_ver')!==APP_VER){
   localStorage.setItem('app_ver',APP_VER);
   if('caches' in window)caches.keys().then(n=>{n.forEach(c=>{if(c.includes('fitness-workbench'))caches.delete(c);});}).then(()=>location.reload(true));
@@ -3241,8 +3241,8 @@ function buildFoodTerms(){
   terms.sort((x,y)=>y.term.length-x.term.length);
   return terms;
 }
-function calcByQty(food,amount){ // amount: 100g/ml 食物传克数，计件食物传件数
-  if(food.u==='100g'||food.u==='100ml')return food.cal*(amount/100);
+function calcByQty(food,amount,forceWeight){ // amount: 100g/ml 食物传克数，计件食物传件数
+  if(forceWeight||food.u==='100g'||food.u==='100ml')return food.cal*(amount/100);
   return food.cal*amount;
 }
 /* 中文数字 → 阿拉伯（一二三四五六七八九十/两/双/半/零/几/十X/X十） */
@@ -3329,9 +3329,11 @@ function matchFoodCal(text){
     if(best){
       if(/[炒煎炸爆溜]/i.test(best.term))cookedWithOil=true; // 含烹饪动词（炒蛋/煎蛋/干炒等）→ 计炒菜油
       const isW=(best.u==='100g'||best.u==='100ml');
+      const explicitWeight=!!(mw && /^(g|克|毫升|ml)$/i.test(mw));  // v61：用户显式写克单位 → 强制按克算，无视 FOOD_DB.u（修"80g 番薯 6880"类脏数据 bug）
+      const useWeight=isW||explicitWeight;
       let amount, realQty;
-      if(isW){
-        if(mw && /^(g|克|毫升|ml)$/i.test(mw)) amount=qty;            // 显式克/毫升
+      if(useWeight){
+        if(explicitWeight) amount=qty;                               // 显式 g/克/ml/毫升 → 直接当克数
         else if(mw==='两') amount=qty*50;                            // 两=50g
         else if(mw==='斤') amount=qty*500;                           // 斤=500g
         else if(mw) amount=qty*100;                                  // 碗/块/片/个…≈100g/份
@@ -3349,14 +3351,15 @@ function matchFoodCal(text){
         const tm=text.slice(k2).match(_MW_RE);
         if(tm){
           const tmw=tm[0];
-          if(isW){
+          const pfW=isW||/^(g|克|毫升|ml)$/i.test(tmw);  // v61：后置量词是克单位也强制按克算
+          if(pfW){
             let a2;
             if(/^(g|克|毫升|ml)$/i.test(tmw)) a2=tq.qty;
             else if(tmw==='两') a2=tq.qty*50;
             else if(tmw==='斤') a2=tq.qty*500;
             else a2=tq.qty*100;
-              amount=a2; realQty=Math.round(a2)+'g';
-            }else{ amount=tq.qty; realQty=tq.qty+(best.u||''); }
+            amount=a2; realQty=Math.round(a2)+'g';
+          }else{ amount=tq.qty; realQty=tq.qty+(best.u||''); }
           k=k2+tm[0].length;
         }else{
           // 后置纯数字/分数（无后量词）：按「份」理解（重量食物按半份≈50g）
@@ -3365,8 +3368,9 @@ function matchFoodCal(text){
           k=k2;
         }
       }
-      const cal=Math.round(calcByQty(best,amount));
-      const carb=Math.round((best.carb||0)*(isW?amount/100:amount));
+      const finalUseWeight=/g$/.test(realQty);  // v61：以 realQty 末位 'g' 判断 amount 是否为克数（覆盖前缀/后置克单位强制）
+      const cal=Math.round(calcByQty(best,amount,finalUseWeight));
+      const carb=Math.round((best.carb||0)*(finalUseWeight?amount/100:amount));
       parts.push({name:best.name,qty:realQty,cal,carb});
       totalCal+=cal;totalCarb+=carb;
       i=k;

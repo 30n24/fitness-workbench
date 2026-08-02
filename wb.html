@@ -1707,7 +1707,7 @@ const MENUS = {
 const KEY='fitness_workbench_v2';
 let state=load();
 // 强制缓存更新：版本变化时清除所有 sw 缓存并硬刷新
-const APP_VER='61';
+const APP_VER='62';
 if(localStorage.getItem('app_ver')!==APP_VER){
   localStorage.setItem('app_ver',APP_VER);
   if('caches' in window)caches.keys().then(n=>{n.forEach(c=>{if(c.includes('fitness-workbench'))caches.delete(c);});}).then(()=>location.reload(true));
@@ -4632,12 +4632,25 @@ function parseExPerf(text){
   let s=(''+text).replace(/，/g,',')
   const sep=/[、/→\-]|->/;
   let wSeq=null,rSeq=null, unit=null, wraw=null;
-  // 重量序列：60/50/40/30kg 或 20→30→40kg（捕获完整序列，而非末一对）
-  const wm=s.match(/((?:\d+(?:\.\d+)?(?:[、/→\-]|->))+\d+(?:\.\d+)?)\s*(kg|公斤|千克|磅|lb|jin|斤)/i);
-  if(wm){ wSeq=wm[1].split(sep).map(Number); unit=unit||normUnit(wm[2]); wraw=wSeq[wSeq.length-1]; s=s.replace(wm[0],' '); }
-  // 次数序列：12/10/8/6次
+  // 次数序列先于重量序列提取（避免「15/12/12/12次」被裸重量正则误抢）
+  // 次数序列：12/10/8/6次（要求带"次"，与裸重量序列区分）
   const rm=s.match(/((?:\d+(?:\.\d+)?(?:[、/→\-]|->))+\d+(?:\.\d+)?)\s*次/i);
-  if(rm){ rSeq=rm[1].split(sep).map(Number); s=s.replace(rm[0],' '); }
+  if(rm){ rSeq=rm[1].split(sep).map(t=>parseFloat(t.trim())); s=s.replace(rm[0],' '); }
+  // 重量序列：60/50/40/30kg、20→30→40kg、30/40/40/45（裸数字序列也认作重量，默认kg）、30kg/40kg/40kg/45kg（每数可独立带单位）。末尾单位可选
+  const wm=s.match(/((?:\d+(?:\.\d+)?\s*(?:kg|公斤|千克|磅|lb|jin|斤)?\s*(?:[、/→\-]|->)\s*)+\d+(?:\.\d+)?)\s*(kg|公斤|千克|磅|lb|jin|斤)?/i);
+  if(wm){
+    const seqStr=wm[1], tailU=(wm[2]||'').trim();
+    unit=unit||normUnit(tailU||'kg');
+    wSeq=seqStr.split(sep).map(t=>{
+      const mm=t.trim().match(/^(\d+(?:\.\d+)?)\s*(.*)$/);
+      let n=parseFloat(mm[1]);
+      const tu=(mm[2]||'').trim();
+      if(tu){ const u=normUnit(tu); n=n*unitFactor(u)/unitFactor(unit); }
+      return n;
+    });
+    wraw=wSeq[wSeq.length-1];
+    s=s.replace(wm[0],' ');
+  }
   // 链式 组x次x负重（支持带单位后缀），优先于单重量匹配，避免单重量被提前删除破坏解析
   let sets=null,reps=null,weight=null;
   const chain=s.match(/(\d+)\s*[x×X*]\s*(\d+)\s*[x×X*]\s*(\d+(?:\.\d+)?)\s*(kg|公斤|千克|磅|lb|jin|斤)?/i);

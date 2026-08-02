@@ -1707,7 +1707,7 @@ const MENUS = {
 const KEY='fitness_workbench_v2';
 let state=load();
 // 强制缓存更新：版本变化时清除所有 sw 缓存并硬刷新
-const APP_VER='62';
+const APP_VER='63';
 if(localStorage.getItem('app_ver')!==APP_VER){
   localStorage.setItem('app_ver',APP_VER);
   if('caches' in window)caches.keys().then(n=>{n.forEach(c=>{if(c.includes('fitness-workbench'))caches.delete(c);});}).then(()=>location.reload(true));
@@ -4877,15 +4877,18 @@ async function aiLookupExercise(raw,inputId){
     const content=j.choices&&j.choices[0]&&j.choices[0].message?j.choices[0].message.content:'';
 const mm=content.match(/\{[\s\S]*\}/);
 const o=mm?JSON.parse(mm[0]):null;
-if(!o||!o.name)throw new Error('AI 返回格式异常');
+if(!o)throw new Error('AI 返回格式异常');
 const p=parseExPerf(raw);
-const name=(''+o.name).trim()||p.name||raw.trim();
-const sets=o.sets||p.sets, reps=o.reps||p.reps, weight=(o.weight||p.weight||0);
-const cal=estExCal(sets,reps,weight,name);
+// 忠实登记：动作名用用户原始输入（parseExPerf 已清理量词/单位，但保留器械/品牌前缀如「诺德士」），
+// AI 不再重命名——避免把「诺德士下斜推胸」错归一化成「下斜推胸」；组数/次数/每组重量变化全部用本地解析 p，
+// AI 仅补「部位 part」与「说明 note」（cal 本地 MET 估算，本就唔靠 AI）
+const name=(''+(p.name||raw.trim())).trim()||(''+o.name).trim();
+const sets=p.sets, reps=p.reps, weight=(p.weight||0);
 const part=partKeyFromName(o.part)||classifyPart(name);
+const cal=(p.detail&&p.detail.length)?estExCalFromDetail(p.detail,name):estExCal(sets,reps,weight,name);
 addCustomEx(name,sets,reps,weight,null,o.note,'ai',part,p.detail,p.wunit,p.wraw);
 const inp=document.getElementById(inputId);if(inp)inp.value='';
-showFoodHint('✅ AI：'+name+' ≈ '+cal+'kcal（MET 本地估算·'+sets+'组×'+reps+'次'+(weight?('·'+weight+'kg'):'')+'）已记录');
+showFoodHint('✅ AI：'+name+' ≈ '+cal+'kcal（MET 本地估算·'+sets+'组×'+reps+'次'+(weight?('·'+weight+'kg'):'')+(p.detail&&p.detail.length?('·'+p.detail.length+'组不同重量'):'')+'）已记录');
   }catch(e){
     showFoodHint('⚠️ '+fmtAIError(e)+'（或先填组数次数重量，撳「添加」用本地估算）');
   }
